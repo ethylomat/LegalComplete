@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+flake8 = "*"
+autopep8 = "*"
+coverage = "*"
+
+[packages]
+pre-commit = "*"
+
+[scripts]
+test = "coverage run -m unittest discover -s ./tests -p *_test.py"
+report = "coverage html"
+main = "python ./src/main.py"
+
+[requires]
+python_version = "3.7"
