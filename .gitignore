@@ -1,3 +1,6 @@
+## Editors
+.idea/
+
 ## Data
 *.csv
 datasets/**
