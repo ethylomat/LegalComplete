@@ -16,19 +16,17 @@ Cloning into 'LegalComplete'...
 ```
 
 
-It is recommended to install the Python packages local in a virtual environment. Therefore you need `python3`, `python3-pip` and `python3-venv` installed on your system. You can create a virtual environment as follows:
+It is recommended to install the Python packages local in a Pipenv environment:
 ```bash
 $ cd LegalComplete
-$ python3 -m venv venv
-$ . venv/bin/activate # <- the “.” is important
-(venv) $  # <-- activated virtual environment
+$ pipenv install --dev
 ```
 
-Install the required python package with pip:
-
+For development make sure to have `pre-commit` installed in the project ([Documentation](https://pre-commit.com/#install)). 
 ```bash
-$ pip install -r requirements.txt
- ```
+$ pre-commit install
+```
+ 
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
