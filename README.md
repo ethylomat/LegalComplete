@@ -1,4 +1,6 @@
 # LegalComplete
+![Tests](https://github.com/ethylomat/LegalComplete/workflows/Tests/badge.svg)
+![Linting](https://github.com/ethylomat/LegalComplete/workflows/Linting/badge.svg)
 
 Auto-reference for legal documents.
 
