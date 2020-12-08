@@ -1,5 +1,6 @@
 import os
 
+from utils.preprocessing import preprocess
 from utils.retrieve import download_all_datasets
 
 """
@@ -8,4 +9,4 @@ Every module or package it relies on has to be imported at the beginning.
 """
 
 if __name__ == "__main__":
-    download_all_datasets()
+    preprocess()

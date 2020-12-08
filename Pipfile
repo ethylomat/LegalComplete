@@ -10,6 +10,10 @@ coverage = "*"
 
 [packages]
 pre-commit = "*"
+requests = "*"
+tqdm = "*"
+nltk = "*"
+pandas = "*"
 
 [scripts]
 test = "coverage run -m unittest discover -s ./tests -p *_test.py"

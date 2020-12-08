@@ -101,12 +101,17 @@ def download_all_datasets():
         download_dataset(dataset)
 
 
-def extract_dataset(filename) -> bool:
+def extract_dataset(filename):
+    """
+    Extracts zip file of dataset
+    Arguments:
+    - filename: filename of dataset to be unzipped
+    Return:
+    """
     print("=" * 40)
     print("Extracting dataset: ", filename)
     zip = ZipFile(os.path.join(DATA_DIR, filename))
     zip.extractall(DATA_DIR)
-    return True
 
 
 if __name__ == "__main__":
