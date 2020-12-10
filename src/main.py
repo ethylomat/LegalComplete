@@ -1,7 +1,6 @@
 import os
 
 from utils.preprocessing import preprocess
-from utils.retrieve import download_all_datasets
 
 """
 This script is the entrypoint of the program.
