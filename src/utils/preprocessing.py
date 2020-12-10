@@ -20,9 +20,14 @@ class ReferenceMatcher(object):
     """
 
     name = "reference_matcher"
-    expression = r"§ (\d+)"
+    expression = r"§ (\d+)( | \w|\w )*(Abs. \d+)*( Satz \d+| S. \d+)*( Nr. \d+)*( Hs. \d+)*( [A-Z]+[a-z]*[A-Z]+\w*)*"
 
     def __call__(self, doc):
+        """
+        Call method adds entities for document.
+        Return:
+        - doc: document with tagged entities
+        """
         for match in re.finditer(self.expression, doc.text):
             start, end = match.span()
             span = doc.char_span(start, end, label="SECTION_REFERENCE")
@@ -61,7 +66,7 @@ def preprocess():
         print("Could not preprocess (could not read data).")
         return False
 
-    text = df.iloc[9]["text"][815:883]
+    text = df.iloc[9]["text"]  # [815:883]
 
     try:
         nlp = spacy.load("de_core_news_sm")
@@ -74,11 +79,13 @@ def preprocess():
 
     # Matching section references using ReferenceMatcher class
     entity_matcher = ReferenceMatcher()
-    nlp.add_pipe(entity_matcher, after="ner")
+    nlp.add_pipe(entity_matcher, before="tagger")
 
+    print(nlp.pipe_names)
     doc = nlp(sentence)
 
     print([(ent.text, ent.label_) for ent in doc.ents])
+    spacy.displacy.serve(doc, style="ent")
 
 
 if __name__ == "__main__":
