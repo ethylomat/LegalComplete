@@ -2,10 +2,9 @@ import os
 import re
 
 import pandas as pd
-import spacy
 from tqdm import tqdm
 
-from src.utils.common import read_csv
+from src.utils.common import load_spacy_model, read_csv
 from src.utils.matcher import ReferenceMatcher
 
 MODULE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -17,38 +16,39 @@ Preprocessing of files for further processing
 """
 
 
-def load_spacy_model(model_key: str = "de_core_news_sm"):
+def build_pipeline():
     """
-    Function for loading a spacy model. If not downloaded it downloads the model.
-    Arguments:
-    - model_key: spaCy model key
+    Function that creates the pipeline for the creation of (sentence, reference) tuples.
     Returns:
-    - nlp: Spacy instane
+    - nlp: spaCy pipeline instance
     """
-    try:
-        print("Loading spaCy model ...")
-        nlp = spacy.load(model_key)
-    except OSError:
-        print("Downloading spaCy model ...")
-        spacy.cli.download(model_key)
-        nlp = spacy.load(model_key)
-    return nlp
-
-
-def preprocess(filename):
-    file_path = os.path.join(DATA_DIR, filename)
     nlp = load_spacy_model("de_core_news_sm")
-
-    if (df := read_csv(file_path)) is None:
-        print("Could not preprocess (could not read data).")
-        return False
 
     # Matching section references using ReferenceMatcher class
     reference_matcher = ReferenceMatcher()
     nlp.add_pipe(nlp.create_pipe("sentencizer"))
     nlp.add_pipe(reference_matcher, before="tagger")
+    return nlp
 
-    sentence_references = []
+
+def preprocess(filename):
+    """
+    Preprocessing of csv files containing judgements. Expecting column “text” for the column of judgement raw texts.
+    Creates tuples of sentences and section references. Surjective mapping (sentence -> section reference).
+    Arguments:
+    - filename: Filename of the csv file to preprocess
+    Returns:
+    - sentence_reference_df: Dataframe containing list of ("sentence", "reference")
+    """
+
+    file_path = os.path.join(DATA_DIR, filename)
+    nlp = build_pipeline()
+
+    if (df := read_csv(file_path)) is None:
+        print("Could not preprocess (could not read data).")
+        return False
+
+    sentence_reference_pairs = []
 
     print("Finding section references ...")
     for item in tqdm(df["text"]):
@@ -58,23 +58,21 @@ def preprocess(filename):
         doc = nlp(text)
 
         for sentence in doc.sents:
-            section_references = [
+            references = [
                 ent for ent in sentence.ents if ent.label_ == "SECTION_REFERENCE"
             ]
 
             # Select sentences with only one reference
-            if len(section_references) == 1:
-                section_reference = section_references[0]
-                sentence_references.append(
+            if len(references) == 1:
+                section_reference = references[0]
+                sentence_reference_pairs.append(
                     [
                         sentence.text,
                         str(section_reference),
                     ]
                 )
 
-    section_reference_df = pd.DataFrame(sentence_references)
-    print(section_reference_df)
-
-
-if __name__ == "__main__":
-    preprocess()
+    sentence_reference_df = pd.DataFrame(
+        sentence_reference_pairs, columns=["sentence", "reference"]
+    )
+    return sentence_reference_df

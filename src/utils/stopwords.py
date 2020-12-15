@@ -1,11 +1,4 @@
 import os
-import re
-
-import pandas as pd
-import spacy
-from spacy.kb import KnowledgeBase
-from spacy.vocab import Vocab
-from tqdm import tqdm
 
 from src.utils.preprocessing import read_csv
 from src.utils.retrieve import get_dataset_info
@@ -72,6 +65,3 @@ def stopwords():
 
 
 stopwords = stopwords()
-
-if __name__ == "__main__":
-    print(stopwords)

@@ -6,4 +6,5 @@ Every module or package it relies on has to be imported at the beginning.
 """
 
 if __name__ == "__main__":
-    preprocess("example_dataset.csv")
+    preprocessed = preprocess("example_dataset.csv")
+    print(preprocessed)

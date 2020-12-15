@@ -7,7 +7,14 @@ class ReferenceMatcher(object):
     """
 
     name = "reference_matcher"
-    expression = r"(§|Art\.)[ \n]+(\d+)+([ \n]+|[ \n]+\w|\w[ \n]+)*(Abs\.[ \n]+\d+)*([ \n]+Satz[ \n]+\d+|[ \n]+S\.[ \n]+\d+)*([ \n]+Nr\.[ \n]+\d+)*([ \n]+Hs\.[ \n]+\d+)*(?P<book>[ \n]+[A-Z]+[a-z]*[A-Z]+\w*)*"
+    expression = (
+        r"(§|Art\.)[ \n]+(\d+)+([ \n]+|[ \n]+\w|\w[ \n]+)*"
+        r"(Abs\.[ \n]+\d+)*"
+        r"([ \n]+Satz[ \n]+\d+|[ \n]+S\.[ \n]+\d+)*"
+        r"([ \n]+Nr\.[ \n]+\d+)*"
+        r"([ \n]+Hs\.[ \n]+\d+)*"
+        r"(?P<book>[ \n]+[A-Z]+[a-z]*[A-Z]+\w*)*"
+    )
 
     def __call__(self, doc):
         """
@@ -22,7 +29,8 @@ class ReferenceMatcher(object):
             if (
                 span is not None
                 and match.group("book") is not None
-                and "VwGO" in match.group("book")
+                # Filter book
+                # and "VwGO" in match.group("book")
             ):
                 doc.ents = list(doc.ents) + [span]
         return doc
