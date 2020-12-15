@@ -8,6 +8,7 @@ flake8 = "*"
 autopep8 = "*"
 coverage = "*"
 pre-commit = "*"
+pylint = "*"
 
 [packages]
 pip = "*"
