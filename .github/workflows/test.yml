@@ -28,9 +28,9 @@ jobs:
       - name: Run tests
         run: pipenv run test
       - name: Set cache
-          uses: actions/cache@v2
-          with:
-            path: /src/data
-            key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
-            restore-keys: |
-              ${{ runner.os }}-datasets-
+        uses: actions/cache@v2
+        with:
+          path: /src/data
+          key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
+          restore-keys: |
+            ${{ runner.os }}-datasets-
