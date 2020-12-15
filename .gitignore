@@ -1,3 +1,7 @@
+## OS specific
+
+.DS_Store
+
 ## Editors
 .idea/
 
@@ -6,7 +10,8 @@
 datasets/**
 
 ## Python 
-
+# Profiler
+*.prof
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

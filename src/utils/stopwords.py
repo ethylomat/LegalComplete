@@ -54,7 +54,7 @@ def custom_stopwords() -> list:
     """
     custom_stopwords = []
 
-    custom_stopwords += ["- %d -" % i for i in range(1, 150)]
+    # custom_stopwords += ["- %d -" % i for i in range(1, 150)]
     return custom_stopwords
 
 

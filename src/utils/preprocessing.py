@@ -3,7 +3,10 @@ import re
 
 import pandas as pd
 import spacy
-from utils.retrieve import download_all_datasets
+from tqdm import tqdm
+
+from src.utils.common import read_csv
+from src.utils.matcher import ReferenceMatcher
 
 MODULE_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(MODULE_ROOT)
@@ -14,78 +17,63 @@ Preprocessing of files for further processing
 """
 
 
-class ReferenceMatcher(object):
+def load_spacy_model(model_key: str = "de_core_news_sm"):
     """
-    Class for matching section-references (§) in SpaCy.
-    """
-
-    name = "reference_matcher"
-    expression = r"§ (\d+)( | \w|\w )*(Abs. \d+)*( Satz \d+| S. \d+)*( Nr. \d+)*( Hs. \d+)*( [A-Z]+[a-z]*[A-Z]+\w*)*"
-
-    def __call__(self, doc):
-        """
-        Call method adds entities for document.
-        Return:
-        - doc: document with tagged entities
-        """
-        for match in re.finditer(self.expression, doc.text):
-            start, end = match.span()
-            span = doc.char_span(start, end, label="SECTION_REFERENCE")
-            if span is not None:
-                doc.ents = list(doc.ents) + [span]
-        return doc
-
-
-def read_csv(path):
-    """
-    Function for reading csv file from DATA_DIR
+    Function for loading a spacy model. If not downloaded it downloads the model.
     Arguments:
-    - path: path of file
-    Return:
-    - dataframe: Panda dataframe of csv file
+    - model_key: spaCy model key
+    Returns:
+    - nlp: Spacy instane
     """
-    if os.path.exists(path):
-        df = pd.read_csv(path)
-        return df
-    print("Path does not exist. Downloading all available datasets ...")
-    download_all_datasets()
-    if os.path.exists(path):
-        df = pd.read_csv(path)
-        return df
-    print("Path does not exist after downloading.")
-    return None
+    try:
+        print("Loading spaCy model ...")
+        nlp = spacy.load(model_key)
+    except OSError:
+        print("Downloading spaCy model ...")
+        spacy.cli.download(model_key)
+        nlp = spacy.load(model_key)
+    return nlp
 
 
-def preprocess():
-    filename = "example_dataset.csv"
-    path = os.path.join(DATA_DIR, filename)
+def preprocess(filename):
+    file_path = os.path.join(DATA_DIR, filename)
+    nlp = load_spacy_model("de_core_news_sm")
 
-    df = read_csv(path)
-
-    if df is None:
+    if (df := read_csv(file_path)) is None:
         print("Could not preprocess (could not read data).")
         return False
 
-    text = df.iloc[9]["text"]  # [815:883]
-
-    try:
-        nlp = spacy.load("de_core_news_sm")
-    except Exception:
-        spacy.cli.download("de_core_news_sm")
-        nlp = spacy.load("de_core_news_sm")
-
-    sentence = text
-    print(sentence)
-
     # Matching section references using ReferenceMatcher class
-    entity_matcher = ReferenceMatcher()
-    nlp.add_pipe(entity_matcher, before="tagger")
+    reference_matcher = ReferenceMatcher()
+    nlp.add_pipe(nlp.create_pipe("sentencizer"))
+    nlp.add_pipe(reference_matcher, before="tagger")
 
-    print(nlp.pipe_names)
-    doc = nlp(sentence)
+    sentence_references = []
 
-    print([(ent.text, ent.label_) for ent in doc.ents])
-    spacy.displacy.serve(doc, style="ent")
+    print("Finding section references ...")
+    for item in tqdm(df["text"]):
+
+        # Replacing newlines and multiple spaces
+        text = re.sub(r"[ ]+", " ", item.replace("\n", " "))
+        doc = nlp(text)
+
+        for sentence in doc.sents:
+            section_references = [
+                ent for ent in sentence.ents if ent.label_ == "SECTION_REFERENCE"
+            ]
+
+            # Select sentences with only one reference
+            if len(section_references) == 1:
+                section_reference = section_references[0]
+                sentence_references.append(
+                    [
+                        sentence.text,
+                        str(section_reference),
+                    ]
+                )
+
+    section_reference_df = pd.DataFrame(sentence_references)
+    print(section_reference_df)
 
 
 if __name__ == "__main__":

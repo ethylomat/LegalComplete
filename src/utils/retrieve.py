@@ -27,8 +27,27 @@ def get_available_datasets():
     for file in files:
         with open(file, "r") as f:
             dataset_info = json.load(f)
-    datasets.append(dataset_info)
+        datasets.append(dataset_info)
     return datasets
+
+
+def get_dataset_info(key: str):
+    """
+    Returns dict of dataset info
+    Arguments:
+    - key: String with dataset key (or filename)
+    Return:
+    - dataset_info: Dictionary with dataset information
+    """
+    key = key.lower().replace("-", "_").split(".")[0]
+    filename = key + ".json"
+
+    if filename not in os.listdir(os.path.join(MODULE_ROOT, "datasets")):
+        raise FileNotFoundError
+
+    with open(os.path.join(MODULE_ROOT, "datasets/", filename), "r") as f:
+        dataset_info = json.load(f)
+        return dataset_info
 
 
 def download(url: str, filename: str):

@@ -7,16 +7,15 @@ verify_ssl = true
 flake8 = "*"
 autopep8 = "*"
 coverage = "*"
+pre-commit = "*"
 
 [packages]
-pre-commit = "*"
+pip = "*"
 requests = "*"
-tqdm = "*"
-nltk = "*"
-pandas = "*"
-bz2file = "*"
 spacy = "*"
-spacy-lookups-data = "*"
+numpy = "*"
+tqdm = "*"
+pandas = "*"
 
 [scripts]
 test = "coverage run -m unittest discover -s ./tests -p *_test.py"
@@ -24,4 +23,4 @@ report = "coverage html"
 main = "python ./src/main.py"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
