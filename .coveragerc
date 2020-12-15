@@ -1,0 +1,13 @@
+# .coveragerc to control coverage.py
+[run]
+branch = True
+omit =
+    */venv/*
+    */virtualenvs/*
+
+[report]
+omit =
+    */venv/*
+    */virtualenvs/*
+
+[html]
