@@ -18,5 +18,19 @@ jobs:
         run: pip install pipenv
       - name: Install development dependencies
         run: pipenv install --dev
+      - name: Restore cache
+        uses: actions/cache@v2
+        with:
+          path: /src/data
+          key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
+          restore-keys: |
+            ${{ runner.os }}-datasets-
       - name: Run tests
         run: pipenv run test
+      - name: Set cache
+          uses: actions/cache@v2
+          with:
+            path: /src/data
+            key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
+            restore-keys: |
+              ${{ runner.os }}-datasets-
