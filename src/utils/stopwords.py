@@ -45,9 +45,35 @@ def custom_stopwords() -> list:
     Returns:
     - custom_stopwords: List containing custom stopwords.
     """
-    custom_stopwords = []
 
-    # custom_stopwords += ["- %d -" % i for i in range(1, 150)]
+    # TODO: More sophisticated generation of stopwords
+    custom_stopwords = [
+        "die",
+        "des",
+        "auf",
+        "aus",
+        "beruht",
+        "der",
+        "folgt",
+        "im",
+        "sinne",
+        "in",
+        "nach",
+        "gegen",
+        "bedeutung",
+        "nicht",
+        "eine",
+        "gemäß",
+        "den",
+        "abs",
+        "von",
+        "ist",
+        "satz",
+        "zulassungsgrund",
+        "anforderungen",
+        "sie",
+        "vgl",
+    ]
     return custom_stopwords
 
 
