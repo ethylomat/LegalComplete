@@ -4,8 +4,9 @@ import re
 Regex pattern matching law references in german law
 """
 
+
 reference_pattern = re.compile(
-    r"(§|Art\.)[ \n]+([\d+|[ivxclmIVXCLM]+)+([ \n]+|[ \n]+\w|\w[ \n]+)*"
+    r"(§|Art\.)[ \n]+(?P<section>[\d+|[ivxclmIVXCLM]+)+([ \n]+|[ \n]+\w|\w[ \n]+)*"
     r"(Abs\.[ \n]+\d+)*"
     r"([ \n]+UAbs\.[ \n]+\d+)*"
     r"([ \n]+Satz[ \n]+\d+|[ \n]+S\.[ \n]+\d+)*"
