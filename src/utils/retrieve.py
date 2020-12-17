@@ -76,24 +76,27 @@ def download(url: str, filename: str):
     return True
 
 
-def download_dataset(dataset_info, force=False, keep=False) -> bool:
+def download_dataset(dataset: [str, dict], force=False, keep=False) -> bool:
     """
     Download datasets function
     Arguments:
     Return:
     - success: Whether or not function downloaded file from source.
     """
-    downloaded = False
 
+    if type(dataset) == str:
+        dataset = get_dataset_info(dataset)
+
+    downloaded = False
     print("=" * 120)
     print("Downloading Dataset:")
-    print("key:\t\t", dataset_info["key"])
-    print("title:\t\t", dataset_info["title"])
-    print("homepage:\t", dataset_info["homepage"])
+    print("key:\t\t", dataset["key"])
+    print("title:\t\t", dataset["title"])
+    print("homepage:\t", dataset["homepage"])
 
-    url = dataset_info["url"]
+    url = dataset["url"]
     filename = url.split("/")[-1]
-    extracted = dataset_info["extracted"]
+    extracted = dataset["extracted"]
 
     if extracted not in os.listdir(DATA_DIR) or force:
         downloaded = download(url, filename)

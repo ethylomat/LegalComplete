@@ -31,26 +31,26 @@ def build_pipeline():
     return nlp
 
 
-def preprocess(filename):
+def preprocess(df, nlp=None, label: str = ""):
     """
-    Preprocessing of csv files containing judgements. Expecting column “text” for the column of judgement raw texts.
+    Preprocessing of dataframes containing judgements. Expecting column “text” for the column of judgement raw texts.
     Creates tuples of sentences and section references. Surjective mapping (sentence -> section reference).
     Arguments:
-    - filename: Filename of the csv file to preprocess
+    - df: Dataframe to preprocess
     Returns:
     - sentence_reference_df: Dataframe containing list of ("sentence", "reference")
     """
 
-    file_path = os.path.join(DATA_DIR, filename)
-    nlp = build_pipeline()
+    if not nlp:
+        nlp = build_pipeline()
 
-    if (df := read_csv(file_path)) is None:
-        print("Could not preprocess (could not read data).")
-        return False
+    if label != "":
+        label = "(%s)" % label
 
     sentence_reference_pairs = []
 
-    print("Finding section references ...")
+    print()
+    print("Finding section references %s..." % label)
     for item in tqdm(df["text"]):
 
         # Replacing newlines and multiple spaces
@@ -67,7 +67,7 @@ def preprocess(filename):
                 section_reference = references[0]
                 sentence_reference_pairs.append(
                     [
-                        sentence.text,
+                        sentence,
                         str(section_reference),
                     ]
                 )

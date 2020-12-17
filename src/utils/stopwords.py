@@ -1,5 +1,7 @@
 import os
 
+import spacy
+
 from src.utils.preprocessing import read_csv
 from src.utils.retrieve import get_dataset_info
 
@@ -77,17 +79,22 @@ def custom_stopwords() -> list:
     return custom_stopwords
 
 
-def stopwords():
+def stopwords(nlp=None):
     """
     Main function for generation of stopword list
     Returns:
-    - stopwords: List of stopwords (containing stopwords from csv and custom stopwords
+    - stopwords:
+        List of stopwords (containing stopwords from csv and custom stopwords)
+        If spaCy model provided, stopwords will be added to model stopwords.
     """
-    df = read_stopwords_csv()
-    stopwords = stopwords_from_df(df)
-    stopwords += custom_stopwords()
-    stopwords = list(set(stopwords))
-    return stopwords
+    stopwords_df = read_stopwords_csv()
+    sws = stopwords_from_df(stopwords_df)
+    sws += custom_stopwords()
+    sws = list(set(sws))
 
-
-stopwords = stopwords()
+    if nlp:
+        model_stopwords = nlp.Defaults.stop_words
+        for word in sws:
+            model_stopwords.add(word)
+        return model_stopwords
+    return sws

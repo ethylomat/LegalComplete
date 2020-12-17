@@ -18,3 +18,5 @@ reference_pattern = re.compile(
     r"(?P<book>[ \n]+[A-ZÄÖÜß]+[a-zöäüß]*[A-ZÖÄÜß]+\w*)*",
     flags=re.MULTILINE,
 )
+
+word_pattern = re.compile(r"^[^\d\W]+$")
