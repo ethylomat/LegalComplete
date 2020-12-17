@@ -1,5 +1,7 @@
 import os
 import re
+import timeit
+from functools import wraps
 
 import pandas as pd
 import spacy
@@ -82,7 +84,36 @@ def split_dataframe(df, fracs=[0.8, 0.1, 0.1]):
     """
     dfs = []
     for i, frac in enumerate(fracs):
-        partition = df.sample(frac=frac / sum(fracs[i:]), random_state=0)
+        denominator = sum(fracs[i:])
+        if i == 0:
+            denominator = 1
+        partition = df.sample(frac=frac / denominator, random_state=0)
         df = df.drop(partition.index)
         dfs.append(partition)
     return dfs
+
+
+def timer(method):
+    """
+    Method decorator to measure the time for method execution.
+
+    Example useage:
+
+    @timer
+    def hello_world():
+        pass
+    """
+
+    @wraps(method)
+    def timing(self, *method_args, **method_kwargs):
+        start_time = timeit.default_timer()
+        output = method(self, *method_args, **method_kwargs)
+        elapsed = timeit.default_timer() - start_time
+        print(
+            'Method "{name}" took {time} seconds to complete.'.format(
+                name=method.__name__, time=elapsed
+            )
+        )
+        return output
+
+    return timing
