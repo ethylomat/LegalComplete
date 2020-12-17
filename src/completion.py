@@ -1,14 +1,21 @@
-import pandas as pd
+"""
+Completion base class
+
+The completion base class is used to build completion classes for
+different completion methods (e.g. completion_n_gram.py). It stores
+the datasets as dataframes and keeps training, development and test
+subsets.
+"""
 
 from src.utils.common import read_csv, split_dataframe
 from src.utils.retrieve import download_dataset, get_dataset_info
 
-"""
-Completion base class
-"""
-
 
 class Completion:
+    """
+    Completion base class
+    """
+
     data_train, data_test, data_dev = None, None, None
 
     def __init__(self):
@@ -17,9 +24,10 @@ class Completion:
     def feed_data(self, filename: str = "", key: str = ""):
         """
         Method for reading raw files into datasets
-        Arguments:
-        - filename: relative filename in data directory
-        - key: alternative - give dataset key to receive automatically
+
+        Args:
+            filename: relative filename in data directory
+            key: alternative - give dataset key to receive automatically
         """
 
         # If key is provided instead of filename (-> filename is overwritten)
@@ -32,8 +40,8 @@ class Completion:
         full_df = read_csv(filename)
 
         # Splitting dataframe into different sets
-        self.data_train, self.data_test, self.data_dev = split_dataframe(
-            full_df, fracs=[0.8, 0.003, 0.003]
+        self.data_train, self.data_dev, self.data_test = split_dataframe(
+            full_df, fracs=[0.80, 0.10, 0.10]
         )
 
     def __str__(self):

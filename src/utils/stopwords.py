@@ -16,9 +16,10 @@ Preprocessing list of stopwords
 
 def read_stopwords_csv():
     """
-    Reads in list of stopwords from csv file
+    Reads in list of stopwords from csv file.
+
     Returns:
-    - df: Dataframe with stopwords in different columns
+        df: Dataframe with stopwords in different columns.
     """
     dataset_info = get_dataset_info("sw_de_rs")
     df = read_csv(os.path.join(DATA_DIR, dataset_info["extracted"]))
@@ -27,11 +28,13 @@ def read_stopwords_csv():
 
 def stopwords_from_df(df) -> list:
     """
-    Merges dataframe column values of stopwords
-    Arguments:
-    - df: Pandas Dataframe with stopwords in multiple columns
+    Merges dataframe column values of stopwords.
+
+    Args:
+        df: Pandas Dataframe with stopwords in multiple columns.
+
     Returns:
-    - stopwords: Python-Array of stopwords
+        stopwords: Python-Array of stopwords.
     """
     array = []
     for column in df.columns:
@@ -44,8 +47,9 @@ def stopwords_from_df(df) -> list:
 def custom_stopwords() -> list:
     """
     Adding custom stopwords.
+
     Returns:
-    - custom_stopwords: List containing custom stopwords.
+        custom_stopwords: List containing custom stopwords.
     """
 
     # TODO: More sophisticated generation of stopwords
@@ -54,7 +58,6 @@ def custom_stopwords() -> list:
         "des",
         "auf",
         "aus",
-        "beruht",
         "der",
         "folgt",
         "im",
@@ -62,7 +65,6 @@ def custom_stopwords() -> list:
         "in",
         "nach",
         "gegen",
-        "bedeutung",
         "nicht",
         "eine",
         "gemäß",
@@ -71,8 +73,18 @@ def custom_stopwords() -> list:
         "von",
         "ist",
         "satz",
-        "zulassungsgrund",
-        "anforderungen",
+        "januar",
+        "februar",
+        "märz",
+        "april",
+        "mai",
+        "juni",
+        "juli",
+        "august",
+        "september",
+        "oktober",
+        "november",
+        "dezember",
         "sie",
         "vgl",
     ]
@@ -81,14 +93,12 @@ def custom_stopwords() -> list:
 
 def stopwords(nlp=None):
     """
-    Main function for generation of stopword list
+    Main function for generation of stopword list. If spaCy model provided, stopwords will be added to model stopwords.
+
     Returns:
-    - stopwords:
-        List of stopwords (containing stopwords from csv and custom stopwords)
-        If spaCy model provided, stopwords will be added to model stopwords.
+        stopwords: List of stopwords (list or model stopwords)
     """
-    stopwords_df = read_stopwords_csv()
-    sws = stopwords_from_df(stopwords_df)
+    sws = []
     sws += custom_stopwords()
     sws = list(set(sws))
 

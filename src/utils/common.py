@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import timeit
@@ -82,12 +83,13 @@ def split_dataframe(df, fracs=[0.8, 0.1, 0.1]):
     Returns:
     - dfs: List of Dataframes
     """
+    if frac_sum := sum(fracs) > 1:
+        fracs = [frac / frac_sum for frac in fracs]
+
     dfs = []
     for i, frac in enumerate(fracs):
-        denominator = sum(fracs[i:])
-        if i == 0:
-            denominator = 1
-        partition = df.sample(frac=frac / denominator, random_state=0)
+        denominator = 1 - sum(fracs[:i])
+        partition = df.sample(frac=round(frac / denominator, 5), random_state=0)
         df = df.drop(partition.index)
         dfs.append(partition)
     return dfs
@@ -110,7 +112,7 @@ def timer(method):
         output = method(self, *method_args, **method_kwargs)
         elapsed = timeit.default_timer() - start_time
         print(
-            'Method "{name}" took {time} seconds to complete.'.format(
+            '-- Method "{name}" took {time} seconds to complete.'.format(
                 name=method.__name__, time=elapsed
             )
         )

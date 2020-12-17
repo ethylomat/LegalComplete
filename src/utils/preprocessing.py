@@ -16,7 +16,7 @@ Preprocessing of files for further processing
 """
 
 
-def build_pipeline():
+def build_pipeline(disable: list = []):
     """
     Function that creates the pipeline for the creation of (sentence, reference) tuples.
     Returns:
@@ -28,6 +28,10 @@ def build_pipeline():
     reference_matcher = ReferenceMatcher()
     nlp.add_pipe(nlp.create_pipe("sentencizer"))
     nlp.add_pipe(reference_matcher, before="tagger")
+    nlp.disable_pipes(*disable)
+
+    print("\nActivated pipes:")
+    print(nlp.pipe_names)
     return nlp
 
 
@@ -44,14 +48,9 @@ def preprocess(df, nlp=None, label: str = ""):
     if not nlp:
         nlp = build_pipeline()
 
-    if label != "":
-        label = "(%s)" % label
-
     sentence_reference_pairs = []
 
-    print()
-    print("Finding section references %s..." % label)
-    for item in tqdm(df["text"]):
+    for item in tqdm(df["text"], desc=label):
 
         # Replacing newlines and multiple spaces
         text = re.sub(r"[ ]+", " ", item.replace("\n", " "))

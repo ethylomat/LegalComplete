@@ -18,9 +18,9 @@ Functions for handling datasets
 def get_available_datasets():
     """
     Listing available datasets (from .json files in datasets directory)
-    Arguments:
-    Return:
-    - datasets: List of dictionaries containing information about downloadable datasets
+
+    Returns:
+        datasets: List of dictionaries containing information about downloadable datasets
     """
     files = [file for file in glob.glob(os.path.join(MODULE_ROOT, "datasets/*.json"))]
     datasets = []
@@ -34,10 +34,12 @@ def get_available_datasets():
 def get_dataset_info(key: str):
     """
     Returns dict of dataset info
-    Arguments:
-    - key: String with dataset key (or filename)
-    Return:
-    - dataset_info: Dictionary with dataset information
+
+    Args:
+        key: String with dataset key (or filename)
+
+    Returns:
+        dataset_info: Dictionary with dataset information
     """
     key = key.lower().replace("-", "_").split(".")[0]
     filename = key + ".json"
@@ -53,11 +55,13 @@ def get_dataset_info(key: str):
 def download(url: str, filename: str):
     """
     Downloads file from url (with progress bar)
-    Arguments:
-    - url: url of the source
-    - filename: filename of the file to write to
-    Return:
-    - success: Whether or not function downloaded file from source.
+
+    Args:
+        url: url of the source
+        filename: filename of the file to write to
+
+    Returns:
+        success: Whether or not function downloaded file from source.
     """
     resp = requests.get(url, stream=True)
     total = int(resp.headers.get("content-length", 0))
@@ -76,19 +80,28 @@ def download(url: str, filename: str):
     return True
 
 
-def download_dataset(dataset: [str, dict], force=False, keep=False) -> bool:
+def download_dataset(
+    dataset: [str, dict], force: bool = False, keep: bool = False
+) -> bool:
     """
     Download datasets function
+
     Arguments:
-    Return:
-    - success: Whether or not function downloaded file from source.
+        dataset: Dataset key or dataset_info dict
+        force: Re-downloads file.
+        keep: If not keep, .zip file is deleted
+
+    Returns:
+        success: Whether or not function downloaded file from source.
     """
 
     if type(dataset) == str:
         dataset = get_dataset_info(dataset)
 
     downloaded = False
-    print("=" * 120)
+
+    print()
+    print("-" * 100)
     print("Downloading Dataset:")
     print("key:\t\t", dataset["key"])
     print("title:\t\t", dataset["title"])
@@ -108,15 +121,16 @@ def download_dataset(dataset: [str, dict], force=False, keep=False) -> bool:
         if not keep:
             print("Removing zip file: ", filename)
             os.remove(os.path.join(DATA_DIR, filename))
+    print("-" * 100)
     return downloaded
 
 
 def download_all_datasets():
     """
     Download all available datasets
-    Arguments:
+
     Return:
-    - success: Whether or not function completed successfully.
+        success: Whether or not function completed successfully.
     """
     print("Downloading all datasets ...")
     for dataset in get_available_datasets():
@@ -125,15 +139,15 @@ def download_all_datasets():
 
 def extract_dataset(filename):
     """
-    Extracts zip file of dataset
-    Arguments:
-    - filename: filename of dataset to be unzipped
-    Return:
+    Extracts zip file of dataset.
+
+    Args:
+        filename: filename of dataset to be unzipped.
     """
     print("=" * 40)
     print("Extracting dataset: ", filename)
-    zip = ZipFile(os.path.join(DATA_DIR, filename))
-    zip.extractall(DATA_DIR)
+    zipfile = ZipFile(os.path.join(DATA_DIR, filename))
+    zipfile.extractall(DATA_DIR)
 
 
 if __name__ == "__main__":
