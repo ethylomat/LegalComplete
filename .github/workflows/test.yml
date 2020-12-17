@@ -18,19 +18,15 @@ jobs:
         run: pip install pipenv
       - name: Install development dependencies
         run: pipenv install --dev
+      - name: Get Date
+          id: get-date
+          run: |
+            echo "::set-output name=date::$(/bin/date -u "+%Y%m%d-%H")"
+          shell: bash
       - name: Restore cache
         uses: actions/cache@v2
         with:
           path: /src/data
-          key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
-          restore-keys: |
-            ${{ runner.os }}-datasets-
+          key: ${{ runner.os }}-${{ hashFiles('/src/main.py') }}
       - name: Run tests
         run: pipenv run test
-      - name: Set cache
-        uses: actions/cache@v2
-        with:
-          path: /src/data
-          key: ${{ runner.os }}-datasets-${{ hashFiles('/src/data/*') }}
-          restore-keys: |
-            ${{ runner.os }}-datasets-
