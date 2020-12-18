@@ -188,6 +188,14 @@ Statute books
 
 #### Results
 
+The figures show a dot per frequent ngram. Only the top ngram per ngram length is shown.
+
+![alt text](https://github.com/ethylomat/LegalComplete/blob/main/doc/img/pattern_search/frequent_phrases_ngrams_length_4-14.png)
+
+Frequencies of longer ngrams (from 15-50) can be seen in the second figure.
+
+![alt text](https://github.com/ethylomat/LegalComplete/blob/main/doc/img/pattern_search/frequent_phrases_ngrams_length_15-50.png)
+
 The following is a list of the most frequently occurring pattern per n for ngrams with length n.
 In this case only ngrams from length 4 to 14 are shown.
 
