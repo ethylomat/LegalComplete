@@ -141,24 +141,24 @@ This however probably only results from rare references not being included.
 
 By observing the changes within the more frequently used references, the order of co-occurrences and co-occurrence frequency is not stable.
 E.g. (drastic example) VwGO 100 appears almost exclusively within the "Beschluss" subset, VwGO 100 occurrence to VwGO 99 2 appears 1600 times within "Beschluss", but never in "Urteil". 
-Creating subset co-occurrence matrices for medium sized subdivisions of the data-set could therefore probably improve detection quality and should be considered for further examination. 
+
+Creating subset co-occurrence matrices for medium sized subdivisions of the data-set could therefore probably improve reference suggestion for detectable parameters (which identify subdivisions) and should be considered for further examination. 
 
 ```
 Top 5 co-occurrences of VwGO 100:
-+---------------+---------------------------+
-| First 		| [VwGO 99 2, 1606]			|
-| Second   		| [VwGO 99, 862]			|
-| Third     	| [VwGO 100, 644]			|
-| Fourth    	| [VwGO 154 2, 184]			|
-| Fifth     	| [VwGO 99 1, 154]			|
-+---------------+---------------------------+
++-----------+-----------------------+
+| First 	| [VwGO 99 2, 1606]		|
+| Second   	| [VwGO 99, 862]		|
+| Third     | [VwGO 100, 644]		|
+| Fourth    | [VwGO 154 2, 184]		|
+| Fifth     | [VwGO 99 1, 154]		|
++-----------+-----------------------+
 ```
 
 Additionally the mean and variance of occurrences per document per subgroup shows how many references we can expect per document and how (in-)consistent this user behaviour probably is (files: mean_ref_occurrence_per_doc(/_variance)).
 
-As for all three categories the mean reference occurrence is in the range of 5 to 9, whereas the variance is somewhere between 40 to 90, thus this is probably not a feasible and meaningful parameter to safely consider.
+As for all three categories the mean is in the range of 5 to 9, whereas the variance is somewhere between 40 to 90, thus this is probably not a feasible and meaningful parameter to safely consider.
 A certain minimum of reference mentioning can be expected, but e.g. the co-occurrences should probably not be chained to the total amount of occurrences per document, especially as the amount is not foreseeable.
-
 
 
 ### Experiments
