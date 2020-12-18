@@ -157,7 +157,7 @@ Top 5 co-occurrences of VwGO 100:
 
 Additionally the mean and variance of occurrences per document per subgroup shows how many references we can expect per document and how (in-)consistent this user behaviour probably is (files: mean_ref_occurrence_per_doc(/_variance)).
 
-As for all three categories the mean is in the range of 5 to 9, whereas the variance is somewhere between 40 to 90, thus this is probably not a feasible and meaningful parameter to safely consider.
+As for all three categories the general mean reference occurrence is in the range of 5 to 9, whereas the variance is somewhere between 40 to 90, thus this is probably not a feasible and meaningful parameter to safely consider.
 A certain minimum of reference mentioning can be expected, but e.g. the co-occurrences should probably not be chained to the total amount of occurrences per document, especially as the amount is not foreseeable.
 
 
