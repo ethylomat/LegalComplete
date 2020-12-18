@@ -99,11 +99,65 @@ For the first steps we will constrain to the corpus of jugements of the federal 
 In the future we will test on other corpora of german federal courts.  
 List of datasets: [https://zenodo.org/communities/sean-fobbe-data/](https://zenodo.org/communities/sean-fobbe-data/) 
 
-#### Preprocessing
+#### Preprocessing:
+Before any further processing took place, the data-set was tokenized and the sentences were filtered in such way, that only sentences with an occurring "§" were used.
+This was done to reduce the size of the data-set and reduce computation times.
 
-#### Basic Statistics
 
-#### Examples
+#### Basic Statistics:
+The plots and csv. files can be accessed via: doc/img within the repository.
+They are divided after subgroups with prefixes Total, Beschluss and Urteil.
+
+A general statistical analysis was conducted for the complete data-set. 
+For a more sophisticated analysis, this was repeated for different subgroups of decisions within the data-set.
+
+##### General Analysis:
+
+The general analysis engaged some questions of data-set overview, content and estimation of user behaviour.
+
+First, the distribution of sentences and legal ruling was examined (file: general_distribution_of_procedure).
+The plot shows how many sentences and legal rulings are in the data-set, additionally their sub-parts after type of procedure are displayed in the form (type of decision, type of procedure).
+(Types of procedures: e.g. A: erstinstanzliche Klage, C: Revisionen in Verwaltungsstreitverfahren, ... )
+
+The general distribution of the procedures shows us the main constituents of the data-set. 
+By further subdividing the data-set, variances in relative occurrences and finally variances within the co-occurrence matrices for each subset might indicate the need to introduce criteria for increasing the suggestion rate per subdivision (if the subdivision is known or can be extracted).  
+
+
+##### Subset Analysis:
+
+The goal of the subset analysis was to determine if a detection of subgroups is necessary and / or feasible and if such a detection might (if introduced into the detection algorithm) improve the suggestion quality.
+
+For all documents within the data-set (# 24224) and the major subgroups, which were chosen after the type of decision (Urteil (sentence), # 4131 ; Beschluss (legal ruling), # 20076), the most occurring references (with and without paragraph subdivision (files: references_all, Total_references_all_reduced)) and the occurring law-books mentioned were extracted (files: books_all, books_all_reduced). 
+
+What catches the eye is, that the "Beschluss" subset is less diverse than the "Urteil" subset, in all "VwGO" is obviously most frequently mentioned.
+The second most mentioned law-book is already different (Urteil: SGB, Beschluss: ZPO).
+This is also observable by examining the reference plots.
+
+##### Co-occurrences:
+
+Furthermore, the co-occurrence matrices for occurring references were calculated and a top 5 of most co-occurrences per reference were saved as a .csv.
+Comparing the subgroups, the dimensionality is reduced considerably by only interacting with certain subgroups (Total: # 4000, Urteil: # 2600, Beschluss: # 2500).
+This however probably only results from rare references not being included.
+
+By observing the changes within the more frequently used references, the order of co-occurrences and co-occurrence frequency is not stable.
+E.g. (drastic example) VwGO 100 appears almost exclusively within the "Beschluss" subset, VwGO 100 occurrence to VwGO 99 2 appears 1600 times within "Beschluss", but never in "Urteil". 
+Creating subset co-occurrence matrices for medium sized subdivisions of the data-set could therefore probably improve detection quality and should be considered for further examination. 
+
+```
+Top 5 co-occurrences of VwGO 100:
++-----------+-----------------------+
+| First 	| [VwGO 99 2, 1606]		|
+| Second   	| [VwGO 99, 862]		|
+| Third     | [VwGO 100, 644]		|
+| Fourth    | [VwGO 154 2, 184]		|
+| Fifth     | [VwGO 99 1, 154]		|
++-----------+-----------------------+
+```
+
+Additionally the mean and variance of occurrences per document per subgroup shows how many references we can expect per document and how (in-)consistent this user behaviour probably is (files: mean_ref_occurrence_per_doc(/_variance)).
+As for all three categories the mean is in the range of 5 to 9, whereas the variance is somewhere between 40 to 90, thus this is probably not a feasible and meaningful parameter to safely consider.
+A certain minimum of reference mentioning can be expected, but e.g. the co-occurrences should probably not be chained to the total amount of occurrences per document, especially as the amount is not foreseeable.
+
 
 
 ### Experiments
