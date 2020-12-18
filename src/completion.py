@@ -41,7 +41,7 @@ class Completion:
 
         # Splitting dataframe into different sets
         self.data_train, self.data_dev, self.data_test = split_dataframe(
-            full_df, fracs=[0.80, 0.10, 0.10]
+            full_df, fracs=[0.20, 0.025, 0.025]
         )
 
     def __str__(self):

@@ -8,7 +8,6 @@ import re
 from collections import Counter
 
 from rich import box, print
-from rich.console import Console
 from rich.table import Table
 from tqdm import tqdm
 
@@ -132,6 +131,7 @@ class NGramCompletion(Completion):
         if not self.bigram_counts:
             self.bigram_counts = {}
 
+        # TODO: Optimization
         if not test:
             for bigram in tqdm(bigrams, desc="Counting bigrams ..."):
                 secondaries = [b[1] for b in bigrams if b[0] == bigram[0]]
