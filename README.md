@@ -147,11 +147,11 @@ Creating subset co-occurrence matrices for medium sized subdivisions of the data
 ```
 Top 5 co-occurrences of VwGO 100:
 +-----------+-----------------------+
-| First 	| [VwGO 99 2, 1606]		|
-| Second   	| [VwGO 99, 862]		|
-| Third     | [VwGO 100, 644]		|
-| Fourth    | [VwGO 154 2, 184]		|
-| Fifth     | [VwGO 99 1, 154]		|
+| First 	   | [VwGO 99 2, 1606]	  	 |
+| Second   	| [VwGO 99, 862]	      	|
+| Third     | [VwGO 100, 644]	     	|
+| Fourth    | [VwGO 154 2, 184]	   	|
+| Fifth     | [VwGO 99 1, 154]	    	|
 +-----------+-----------------------+
 ```
 
