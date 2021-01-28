@@ -3,6 +3,6 @@
    "description":"Das Corpus der Entscheidungen des Bundesverwaltungsgerichts (CE-BVerwG) ist der bislang gr\u00f6\u00dfte, frei verf\u00fcgbare Datensatz von Entscheidungen des Bundesverwaltungsgerichts. Er ist eine Zusammenstellung aller Entscheidungen die auf der offiziellen Webseite des Bundesverwaltungsgerichts (www.bverwg.de) am jeweiligen Stichtag ver\u00f6ffentlicht waren.",
    "homepage":"https://doi.org/10.5281/zenodo.3911068",
    "title":"Corpus der Entscheidungen des Bundesverwaltungsgerichts (CE-BVerwG)",
-   "url": "https://zenodo.org/record/3911068/files/2020_06_23_CE-BVerwG_DE_CSV.zip",
+   "url": "https://static.ethylomat.de/datasets/2020_06_23_CE-BVerwG_DE_CSV.zip",
    "extracted": "2020_06_23_CE-BVerwG_DE_Datensatz.csv"
 }
