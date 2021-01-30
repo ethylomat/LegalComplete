@@ -7,6 +7,7 @@ the datasets as dataframes and keeps training, development and test
 subsets.
 """
 
+from src.completion_n_gram import NGramCompletion
 from src.utils.common import read_csv, split_dataframe
 from src.utils.retrieve import download_dataset, get_dataset_info
 
@@ -15,6 +16,11 @@ class Completion:
     """
     Completion base class
     """
+
+    trigger_model = "NGRAM"
+    reference_suggestion_model = "NGRAM"
+
+    nc = None  # Ngram completion object
 
     data_train, data_test, data_dev = None, None, None
 
@@ -43,6 +49,18 @@ class Completion:
         self.data_train, self.data_dev, self.data_test = split_dataframe(
             full_df, fracs=[0.80, 0.10, 0.10]
         )
+
+    def set_model(self):
+        pass
+
+    def train_data(self):
+        if self.trigger_model == "NGRAM" or self.reference_suggestion_model == "NGRAM":
+            self.nc = NGramCompletion(self.data_train, self.data_dev, self.data_test)
+            self.nc.train()
+
+    def evaluate(self):
+        if self.reference_suggestion_model == "NGRAM":
+            self.nc.evaluate()
 
     def __str__(self):
         """
