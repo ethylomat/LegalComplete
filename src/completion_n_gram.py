@@ -291,7 +291,7 @@ class NGramCompletion(Completion):
         Method for evaluation of suggestions. Prints the amounts of correct suggestions based on the test set.
         Considering the suggestion being suggested at the top 3 suggestions.
         """
-        TRIGGER_THRESHOLD = 0.5
+        TRIGGER_THRESHOLD = 0.9
 
         first = 0
         three = 0
