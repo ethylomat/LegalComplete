@@ -78,38 +78,32 @@ class NGramCompletion:
     nlp = None
     stopwords = None
     sentence_reference_train = None
-    sentence_reference_test = None
+    data_test = None
     sentence_reference_dev = None
     bigram_counts = None
     bigram_reference_probs = None
     wordlist = None
 
-    def __init__(self):
-        self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
+    def __init__(self, nlp):
+        self.nlp = nlp
         self.stopwords = stopwords(self.nlp)
 
     @timer
-    def train(self, data_train, data_dev, data_test):
-        self.data_train, self.data_dev, self.data_test = data_train, data_dev, data_test
+    def train(self, data_train, data_dev):
+        self.data_train, self.data_dev = data_train, data_dev
         print("\nFinding section references ...")
 
         self.sentence_reference_train = preprocess(
             self.data_train, nlp=self.nlp, label="training set"
         )
-        self.sentence_reference_test = preprocess(
-            self.data_test, nlp=self.nlp, label="test set"
-        )
         self.sentence_reference_dev = preprocess(
             self.data_dev, nlp=self.nlp, label="dev set"
         )
-
         self.find_ngrams(self.sentence_reference_train)
         self.find_ngrams(self.sentence_reference_dev)
-        self.find_ngrams(self.sentence_reference_test)
 
         self.find_bigrams(self.sentence_reference_train)
         self.find_bigrams(self.sentence_reference_dev, test=True)
-        self.find_bigrams(self.sentence_reference_test, test=True)
 
     @timer
     def find_ngrams(self, df):
@@ -243,12 +237,13 @@ class NGramCompletion:
             prob *= self.get_bigram_prob((ngram[i], ngram[i + 1]))
         return prob
 
-    def get_suggestions(self, ngram):
+    def get_suggestions(self, ngram, num_suggestions: int):
         """
         Method to receive n-gram based norm reference suggestions.
 
         Args:
             ngram: n-1 gram input for suggestion
+            num_suggestions: only the top n suggestions will be returned
         Returns:
             probs: sorted list of top 100 (probability, word) pairs for suggestion. Probability is currently not normed.
         """
@@ -258,7 +253,7 @@ class NGramCompletion:
             prob = self.get_ngram_prob(ngram + [word])
             if prob != 0 and "§" in word:
                 probs.append((prob, word))
-        probs = sorted(probs)[::-1][:100]
+        probs = sorted(probs)[::-1][:num_suggestions]
         return probs
 
     def get_trigger_prob(self, ngram):
@@ -284,91 +279,3 @@ class NGramCompletion:
         except KeyError:
             prob = 0
         return prob
-
-    @timer
-    def evaluate(self):
-        """
-        Method for evaluation of suggestions. Prints the amounts of correct suggestions based on the test set.
-        Considering the suggestion being suggested at the top 3 suggestions.
-        """
-        TRIGGER_THRESHOLD = 0.9
-
-        first = 0
-        three = 0
-        incorrect = 0
-        failed = 0
-
-        correct_trigger = 0
-        false_trigger = 0
-
-        print("\nEvaluating ...")
-        for test_sample in tqdm(self.sentence_reference_test.iloc, desc="Evaluation"):
-            trigger_prob = self.get_trigger_prob(test_sample["ngram no sw"][-2:-1])
-
-            x = test_sample["ngram"][:-1]  # Input (n-1)-gram
-            y = test_sample["ngram"][-1:][0]  # Output 1-gram
-
-            # Top 3 suggestions
-            suggestions = [suggestion[1] for suggestion in self.get_suggestions(x)[:3]]
-            if len(suggestions) > 0:
-                if y == suggestions[0]:
-                    first += 1
-                if y in suggestions:
-                    three += 1
-                else:
-                    incorrect += 1
-            else:
-                failed += 1
-
-            sample = test_sample["ngram no sw"]
-            bigrams = zip(sample[:-1], sample[1:])
-
-            for bigram in bigrams:
-                x = bigram[:1]
-                y = bigram[-1:]
-
-                trigger_prob = self.get_trigger_prob(x)
-                if trigger_prob >= TRIGGER_THRESHOLD:
-                    if y[0].startswith("§"):
-                        correct_trigger += 1
-                    else:
-                        false_trigger += 1
-
-        overall_trigger = correct_trigger + false_trigger
-        overall_count = three + incorrect + failed
-
-        # Printing the results
-        print()
-        table = Table(
-            title="Evaluation results:",
-            title_justify="left",
-            show_header=False,
-            show_lines=False,
-            box=box.ASCII_DOUBLE_HEAD,
-        )
-        table.add_row("overall test samples", f"{overall_count}")
-        table.add_row(
-            "[green]correct (first)", f"{first} ({first / overall_count:2.5f})"
-        )
-        table.add_row(
-            "[yellow]correct (top 3)", f"{three} ({three / overall_count:2.5f})"
-        )
-        table.add_row(
-            "[red]incorrect", f"{incorrect} ({incorrect / overall_count:2.5f})"
-        )
-        table.add_row("failed", f"{failed} ({failed / overall_count:2.5f})")
-
-        table.add_row("", "")
-        table.add_row(
-            "correct triggered",
-            f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
-        )
-        table.add_row(
-            "false triggered",
-            f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
-        )
-        table.add_row(
-            "overall triggered",
-            f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
-        )
-        print(table)
