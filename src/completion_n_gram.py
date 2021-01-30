@@ -298,14 +298,8 @@ class NGramCompletion:
         incorrect = 0
         failed = 0
 
-        triggered_first = 0
-        triggered_three = 0
-        triggered_incorrect = 0
-        triggered_failed = 0
-
         correct_trigger = 0
         false_trigger = 0
-        overall_trigger = 0
 
         print("\nEvaluating ...")
         for test_sample in tqdm(self.sentence_reference_test.iloc, desc="Evaluation"):
@@ -319,20 +313,12 @@ class NGramCompletion:
             if len(suggestions) > 0:
                 if y == suggestions[0]:
                     first += 1
-                    if trigger_prob >= TRIGGER_THRESHOLD:
-                        triggered_first += 1
                 if y in suggestions:
                     three += 1
-                    if trigger_prob >= TRIGGER_THRESHOLD:
-                        triggered_three += 1
                 else:
                     incorrect += 1
-                    if trigger_prob >= TRIGGER_THRESHOLD:
-                        triggered_incorrect += 1
             else:
                 failed += 1
-                if trigger_prob >= TRIGGER_THRESHOLD:
-                    triggered_failed += 1
 
             sample = test_sample["ngram no sw"]
             bigrams = zip(sample[:-1], sample[1:])
@@ -350,9 +336,6 @@ class NGramCompletion:
 
         overall_trigger = correct_trigger + false_trigger
         overall_count = three + incorrect + failed
-        overall_count_triggered = (
-            triggered_three + triggered_incorrect + triggered_failed
-        )
 
         # Printing the results
         print()
@@ -387,23 +370,5 @@ class NGramCompletion:
         table.add_row(
             "overall triggered",
             f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
-        )
-
-        table.add_row("", "")
-        table.add_row(
-            "triggered, first",
-            f"{triggered_first} ({triggered_first / overall_count_triggered:2.5f})",
-        )
-        table.add_row(
-            "triggered, three",
-            f"{triggered_three} ({triggered_three / overall_count_triggered:2.5f})",
-        )
-        table.add_row(
-            "triggered, incorrect",
-            f"{triggered_incorrect} ({triggered_incorrect / overall_count_triggered:2.5f})",
-        )
-        table.add_row(
-            "triggered, failed",
-            f"{triggered_failed} ({triggered_failed / overall_count_triggered:2.5f})",
         )
         print(table)
