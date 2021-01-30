@@ -43,11 +43,11 @@ of the federal administrative court “Bundesverwaltungsgericht”:
 ```
 Evaluation results (n-grams, n=4):                      
 +----------------------+----------------+
-| overall test samples | 4509           |
-| correct (first)      | 1280 (0.28388) |
-| correct (top 3)      | 1663 (0.36882) |
-| incorrect            | 2846 (0.63118) |
-| failed               | 0 (0.00000)    |
+| overall test samples | 1002 (1.00000) |
+| correct (first)      |  397 (0.39621) |
+| correct (top 3)      |  473 (0.47206) |
+| incorrect            |  529 (0.52794) |
+| failed               |    0 (0.00000) |
 +----------------------+----------------+
 ```
 

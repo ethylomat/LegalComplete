@@ -21,6 +21,7 @@ def read_stopwords_csv():
     Returns:
         df: Dataframe with stopwords in different columns.
     """
+
     dataset_info = get_dataset_info("sw_de_rs")
     df = read_csv(os.path.join(DATA_DIR, dataset_info["extracted"]))
     return df
