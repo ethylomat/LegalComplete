@@ -11,7 +11,6 @@ from rich import box, print
 from rich.table import Table
 from tqdm import tqdm
 
-from src.completion import Completion
 from src.utils.common import timer
 from src.utils.preprocessing import build_pipeline, preprocess
 from src.utils.regular_expressions import word_pattern
@@ -68,11 +67,14 @@ def find_norm_bigram(sentence, reference):
                 return None
 
 
-class NGramCompletion(Completion):
+class NGramCompletion:
     """
     Class for n-gram completion of references
     """
 
+    data_train = None
+    data_test = None
+    data_dev = None
     nlp = None
     stopwords = None
     sentence_reference_train = None
@@ -82,15 +84,13 @@ class NGramCompletion(Completion):
     bigram_reference_probs = None
     wordlist = None
 
-    def __init__(self):
-        Completion.__init__(self)
+    def __init__(self, data_train, data_dev, data_test):
+        self.data_train, self.data_dev, self.data_test = data_train, data_dev, data_test
         self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
         self.stopwords = stopwords(self.nlp)
 
     @timer
-    def feed_data(self, filename: str = "", key: str = ""):
-        Completion.feed_data(self, filename=filename, key=key)
-
+    def train(self):
         print("\nFinding section references ...")
 
         self.sentence_reference_train = preprocess(
