@@ -131,11 +131,17 @@ class NGramCompletion(Completion):
         if not self.bigram_counts:
             self.bigram_counts = {}
 
-        # TODO: Optimization
         if not test:
+            # Initializing dict of bigrams with
+            # key: first item of bigrams
+            # item: list of secondary items of bigrams
+            bigram_dict = {bigram[0]: [] for bigram in bigrams}
             for bigram in tqdm(bigrams, desc="Counting bigrams ..."):
-                secondaries = [b[1] for b in bigrams if b[0] == bigram[0]]
-                self.bigram_counts[bigram[0]] = Counter(secondaries)
+                bigram_dict[bigram[0]].append(bigram[1])
+
+            # Applying Count dictionary (collections.Count()) on secondary items list
+            for first, secondaries in bigram_dict.items():
+                self.bigram_counts[first] = Counter(secondaries)
 
     def get_bigram_prob(self, bigram):
         try:
@@ -145,7 +151,7 @@ class NGramCompletion(Completion):
             prob = (counter[bigram[1]] + 1) / (sum(counter.values()) + 1)
             return prob
 
-        # TODO: n-gram unknowns words
+        # No effect for unknown words
         except KeyError:
             return 1
 
