@@ -17,14 +17,10 @@ class Completion:
     Completion base class
     """
 
-    data_train, data_test, data_dev = None, None, None
-
     def __init__(self, model_name: str = "NGRAM"):
         self.model_name = model_name
         if model_name == "NGRAM":
-            self.refmodel = NGramCompletion(
-                self.data_train, self.data_dev, self.data_test
-            )
+            self.refmodel = NGramCompletion()
         else:
             raise ValueError("no model with this key available: ", model_name)
 
@@ -52,7 +48,7 @@ class Completion:
         )
 
     def train_data(self):
-        self.refmodel.train()
+        self.refmodel.train(self.data_train, self.data_dev, self.data_test)
 
     def evaluate(self):
         self.refmodel.evaluate()
