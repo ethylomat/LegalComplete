@@ -6,6 +6,7 @@ different completion methods (e.g. completion_n_gram.py). It stores
 the datasets as dataframes and keeps training, development and test
 subsets.
 """
+from typing import Dict
 
 from rich import box, print
 from rich.table import Table
@@ -69,98 +70,100 @@ class Completion:
             self.data_dev.shape[0],
         )
 
-    def evaluate(self):
-        """
-        Method for evaluation of suggestions. Prints the amounts of correct suggestions based on the test set.
-        Considering the suggestion being suggested at the top 3 suggestions.
-        """
-        data_test = self.data_test
-        refmodel = self.refmodel
-        TRIGGER_THRESHOLD = 0.9
 
-        first = 0
-        three = 0
-        incorrect = 0
-        failed = 0
+def call_evaluate(data_test, refmodel, nlp) -> Dict:
+    """
+    Method for evaluation of suggestions.
+    Prints the amounts of correct suggestions based on the test set.
+    Considering the suggestion being suggested at the top 3 suggestions.
+    """
 
-        correct_trigger = 0
-        false_trigger = 0
+    first = 0
+    three = 0
+    incorrect = 0
+    failed = 0
 
-        # prepare eval data
-        data_test = preprocess(data_test, nlp=self.nlp, label="test set")
-        refmodel.find_ngrams(data_test)
-        refmodel.find_bigrams(data_test, test=True)
+    data_test = preprocess(data_test, nlp=nlp, label="test set")
 
-        print("\nEvaluating ...")
-        for test_sample in tqdm(data_test.iloc, desc="Evaluation"):
-            trigger_prob = refmodel.get_trigger_prob(test_sample["ngram no sw"][-2:-1])
-
-            x = test_sample["ngram"][:-1]  # Input (n-1)-gram
-            y = test_sample["ngram"][-1:][0]  # Output 1-gram
-
-            # Top 3 suggestions
-            suggestions = [
-                suggestion[1] for suggestion in refmodel.get_suggestions(x, 3)
-            ]
-            if len(suggestions) > 0:
-                if y == suggestions[0]:
-                    first += 1
-                if y in suggestions:
-                    three += 1
-                else:
-                    incorrect += 1
+    batch_suggestions = refmodel.batch_evaluate(data_test, 3)
+    print("\nEvaluating ...")
+    for (suggestions, test_sample) in tqdm(
+        zip(batch_suggestions, data_test.iloc), desc="Evaluation"
+    ):
+        y = test_sample["reference"]
+        if len(suggestions) > 0:
+            if y == suggestions[0]:
+                first += 1
+            if y in suggestions:
+                three += 1
             else:
-                failed += 1
+                incorrect += 1
+        else:
+            failed += 1
 
-            sample = test_sample["ngram no sw"]
-            bigrams = zip(sample[:-1], sample[1:])
+    overall_count = three + incorrect + failed
+    metrics = {
+        "overall_count": overall_count,
+        "first": first,
+        "three": three,
+        "incorrect": incorrect,
+        "failed": failed,
+    }
+    return metrics
+    """
+    correct_trigger = 0
+    false_trigger = 0
+    TRIGGER_THRESHOLD = 0.9
+    for test_sample in data_test.iloc:
+        sample = test_sample["ngram no sw"]
+        bigrams = zip(sample[:-1], sample[1:])
+        for bigram in bigrams:
+            x = bigram[:1]
+            y = bigram[-1:]
 
-            for bigram in bigrams:
-                x = bigram[:1]
-                y = bigram[-1:]
+            trigger_prob = refmodel.get_trigger_prob(x)
+            if trigger_prob >= TRIGGER_THRESHOLD:
+                if y[0].startswith("§"):
+                    correct_trigger += 1
+                else:
+                    false_trigger += 1
+    overall_trigger = correct_trigger + false_trigger
+    table.add_row(
+        "correct triggered",
+        f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
+    )
+    table.add_row(
+        "false triggered",
+        f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
+    )
+    table.add_row(
+        "overall triggered",
+        f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
+    )    """
 
-                trigger_prob = refmodel.get_trigger_prob(x)
-                if trigger_prob >= TRIGGER_THRESHOLD:
-                    if y[0].startswith("§"):
-                        correct_trigger += 1
-                    else:
-                        false_trigger += 1
 
-        overall_trigger = correct_trigger + false_trigger
-        overall_count = three + incorrect + failed
+def print_metrics(metrics):
+    overall_count = metrics["overall_count"]
+    first = metrics["first"]
+    three = metrics["three"]
+    incorrect = metrics["incorrect"]
+    failed = metrics["failed"]
 
-        # Printing the results
-        print()
-        table = Table(
-            title="Evaluation results:",
-            title_justify="left",
-            show_header=False,
-            show_lines=False,
-            box=box.ASCII_DOUBLE_HEAD,
-        )
-        table.add_row("overall test samples", f"{overall_count}")
-        table.add_row(
-            "[green]correct (first)", f"{first} ({first / overall_count:2.5f})"
-        )
-        table.add_row(
-            "[yellow]correct (top 3)", f"{three} ({three / overall_count:2.5f})"
-        )
-        table.add_row(
-            "[red]incorrect", f"{incorrect} ({incorrect / overall_count:2.5f})"
-        )
-        table.add_row("failed", f"{failed} ({failed / overall_count:2.5f})")
+    # Printing the results
+    print()
+    table = Table(
+        title="Evaluation results:",
+        title_justify="left",
+        show_header=False,
+        show_lines=False,
+        box=box.ASCII_DOUBLE_HEAD,
+    )
+    table.add_row("overall test samples", f"{overall_count}")
+    table.add_row("[green]correct (first)", f"{first} ({first / overall_count:2.5f})")
+    table.add_row("[yellow]correct (top 3)", f"{three} ({three / overall_count:2.5f})")
+    table.add_row("[red]incorrect", f"{incorrect} ({incorrect / overall_count:2.5f})")
+    table.add_row("failed", f"{failed} ({failed / overall_count:2.5f})")
 
-        table.add_row("", "")
-        table.add_row(
-            "correct triggered",
-            f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
-        )
-        table.add_row(
-            "false triggered",
-            f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
-        )
-        table.add_row(
-            "overall triggered",
-            f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
-        )
-        print(table)
+    table.add_row("", "")
+
+    print(table)

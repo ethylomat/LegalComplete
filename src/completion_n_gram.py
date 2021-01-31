@@ -6,9 +6,9 @@ This module implements the n-gram based reference completion.
 
 import re
 from collections import Counter
+from typing import List
 
-from rich import box, print
-from rich.table import Table
+import pandas as pd
 from tqdm import tqdm
 
 from src.utils.common import timer
@@ -19,7 +19,8 @@ from src.utils.stopwords import stopwords
 
 def clean(sentence):
     """
-    Function to clean punctuation, numbers and symbols from SpaCy sentences. Is applied to Pandas dataframe.
+    Function to clean punctuation, numbers and symbols from SpaCy sentences.
+    Is applied to Pandas dataframe.
 
     Args:
         sentence: input sentence (SpaCy doc)
@@ -73,7 +74,6 @@ class NGramCompletion:
     """
 
     data_train = None
-    data_test = None
     data_dev = None
     nlp = None
     stopwords = None
@@ -104,6 +104,24 @@ class NGramCompletion:
 
         self.find_bigrams(self.sentence_reference_train)
         self.find_bigrams(self.sentence_reference_dev, test=True)
+
+    @timer
+    def batch_evaluate(
+        self, data: pd.DataFrame, num_suggestions: int
+    ) -> List[List[str]]:
+        # prepare eval data
+        self.find_ngrams(data)
+        self.find_bigrams(data, test=True)
+        batch_suggestions = []
+        for test_sample in data.iloc:
+            # trigger_prob = self.get_trigger_prob(test_sample["ngram no sw"][-2:-1])
+            x = test_sample["ngram"][:-1]  # Input (n-1)-gram
+            # y = test_sample["ngram"][-1:][0]  # Output 1-gram
+
+            # Top 3 suggestions
+            suggestions = [suggestion[1] for suggestion in self.get_suggestions(x, 3)]
+            batch_suggestions.append(suggestions)
+        return batch_suggestions
 
     @timer
     def find_ngrams(self, df):
@@ -245,7 +263,8 @@ class NGramCompletion:
             ngram: n-1 gram input for suggestion
             num_suggestions: only the top n suggestions will be returned
         Returns:
-            probs: sorted list of top 100 (probability, word) pairs for suggestion. Probability is currently not normed.
+            probs: sorted list of top (probability, word) pairs for suggestion.
+            Probability is currently not normed.
         """
         ngram = [x.lower() for x in ngram if x not in self.stopwords]
         probs = []
@@ -263,7 +282,8 @@ class NGramCompletion:
         Args:
             ngram: n-1 gram input for suggestion probability
         Returns:
-            prob: probability of triggering suggestion (probability of section references for bigram)
+            prob: probability of triggering suggestion
+            (probability of section references for bigram)
         """
         ngram = [x.lower() for x in ngram]
 
