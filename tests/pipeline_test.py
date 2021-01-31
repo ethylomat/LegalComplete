@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from src.completion import call_evaluate
+from src.completion import evaluate_references
 from src.utils.preprocessing import build_pipeline
 
 
@@ -46,7 +46,7 @@ class TestEvaluation(unittest.TestCase):
         data_test = pd.DataFrame({"text": [text]})
         refmodel = MockedModel
         nlp = build_pipeline(disable=["tagger", "parser", "ner"])
-        metrics = call_evaluate(data_test, refmodel, nlp)
+        metrics = evaluate_references(data_test, refmodel, nlp)
         print(metrics)
         self.assertEqual(metrics["first"], 1)
         self.assertEqual(metrics["three"], 1)

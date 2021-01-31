@@ -8,6 +8,7 @@ subsets.
 """
 from typing import Dict
 
+import pandas as pd
 from rich import box, print
 from rich.table import Table
 from tqdm import tqdm
@@ -71,11 +72,17 @@ class Completion:
         )
 
 
-def call_evaluate(data_test, refmodel, nlp) -> Dict:
+def evaluate_references(data_test: pd.DataFrame, refmodel, nlp) -> Dict:
     """
     Method for evaluation of suggestions.
     Prints the amounts of correct suggestions based on the test set.
     Considering the suggestion being suggested at the top 3 suggestions.
+    Args:
+      data_test: data for evaluation
+      refmodel: reference prediction model
+      nlp: spacy pipeline
+    Returns:
+      metrics: dict containing first, three, incorrect, overall_count and more
     """
 
     first = 0
@@ -85,11 +92,11 @@ def call_evaluate(data_test, refmodel, nlp) -> Dict:
 
     data_test = preprocess(data_test, nlp=nlp, label="test set")
 
-    batch_suggestions = refmodel.batch_evaluate(data_test, 3)
     print("\nEvaluating ...")
-    for (suggestions, test_sample) in tqdm(
-        zip(batch_suggestions, data_test.iloc), desc="Evaluation"
-    ):
+    batch_suggestions = refmodel.batch_evaluate(data_test, 3)
+
+    # compute metrics
+    for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):
         y = test_sample["reference"]
         if len(suggestions) > 0:
             if y == suggestions[0]:
@@ -110,7 +117,13 @@ def call_evaluate(data_test, refmodel, nlp) -> Dict:
         "failed": failed,
     }
     return metrics
-    """
+
+
+def evaluate_trigger(data_test, refmodel, nlp):
+
+    data_test = preprocess(data_test, nlp=nlp, label="test set")
+    refmodel.find_ngrams(data_test)
+    refmodel.find_bigrams(data_test, test=True)
     correct_trigger = 0
     false_trigger = 0
     TRIGGER_THRESHOLD = 0.9
@@ -128,18 +141,29 @@ def call_evaluate(data_test, refmodel, nlp) -> Dict:
                 else:
                     false_trigger += 1
     overall_trigger = correct_trigger + false_trigger
-    table.add_row(
-        "correct triggered",
-        f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
+    table = Table(
+        title="Evaluation results:",
+        title_justify="left",
+        show_header=False,
+        show_lines=False,
+        box=box.ASCII_DOUBLE_HEAD,
     )
-    table.add_row(
-        "false triggered",
-        f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
-    )
-    table.add_row(
-        "overall triggered",
-        f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
-    )    """
+    if overall_trigger == 0:
+        raise Exception("trigger never triggered")
+    else:
+        table.add_row(
+            "correct triggered",
+            f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
+        )
+        table.add_row(
+            "false triggered",
+            f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
+        )
+        table.add_row(
+            "overall triggered",
+            f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
+        )
+        print(table)
 
 
 def print_metrics(metrics):
