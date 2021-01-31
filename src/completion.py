@@ -17,15 +17,12 @@ class Completion:
     Completion base class
     """
 
-    trigger_model = "NGRAM"
-    reference_suggestion_model = "NGRAM"
-
-    nc = None  # Ngram completion object
-
-    data_train, data_test, data_dev = None, None, None
-
-    def __init__(self):
-        pass
+    def __init__(self, model_name: str = "NGRAM"):
+        self.model_name = model_name
+        if model_name == "NGRAM":
+            self.refmodel = NGramCompletion()
+        else:
+            raise ValueError("no model with this key available: ", model_name)
 
     def feed_data(self, filename: str = "", key: str = ""):
         """
@@ -50,17 +47,12 @@ class Completion:
             full_df, fracs=[0.80, 0.10, 0.10]
         )
 
-    def set_model(self):
-        pass
-
     def train_data(self):
-        if self.trigger_model == "NGRAM" or self.reference_suggestion_model == "NGRAM":
-            self.nc = NGramCompletion(self.data_train, self.data_dev, self.data_test)
-            self.nc.train()
+        self.refmodel.train(self.data_train, self.data_dev, self.data_test)
 
     def evaluate(self):
-        if self.reference_suggestion_model == "NGRAM":
-            self.nc.evaluate()
+        self.refmodel.evaluate()
+        # TODO: move evaluate logic to completion class
 
     def __str__(self):
         """

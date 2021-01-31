@@ -84,13 +84,13 @@ class NGramCompletion:
     bigram_reference_probs = None
     wordlist = None
 
-    def __init__(self, data_train, data_dev, data_test):
-        self.data_train, self.data_dev, self.data_test = data_train, data_dev, data_test
+    def __init__(self):
         self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
         self.stopwords = stopwords(self.nlp)
 
     @timer
-    def train(self):
+    def train(self, data_train, data_dev, data_test):
+        self.data_train, self.data_dev, self.data_test = data_train, data_dev, data_test
         print("\nFinding section references ...")
 
         self.sentence_reference_train = preprocess(
