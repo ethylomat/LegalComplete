@@ -13,7 +13,7 @@ class TestPipeline(unittest.TestCase):
             "Im Interesse der Verfahrensbeschleunigung macht der Senat von der"
             + "\nMöglichkeit der Zurückverweisung gemäß § 133 Abs. 6 VwGO Gebrauch."
         )
-        self.df_data = pd.DataFrame({'text':[self.text]})
+        self.df_data = pd.DataFrame({"text": [self.text]})
 
     def test_reference_entity_detection(self):
         """builds pipeline and checks whether a sample reference is annotated correctly"""
@@ -32,7 +32,7 @@ class TestPipeline(unittest.TestCase):
 
     def test_preprocess_fast(self):
         data = preprocess_fast(self.df_data)
-        self.assertEqual(data.iloc[0]['reference'], self.target_reference)
+        self.assertEqual(data.iloc[0]["reference"], self.target_reference)
 
 
 class TestEvaluation(unittest.TestCase):
@@ -56,6 +56,3 @@ class TestEvaluation(unittest.TestCase):
         self.assertEqual(metrics["first"], 1)
         self.assertEqual(metrics["three"], 1)
         self.assertEqual(metrics["incorrect"], 0)
-
-
-
