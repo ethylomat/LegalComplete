@@ -8,7 +8,7 @@ from src.utils.preprocessing import preprocess
 
 
 class TransSeqModel:
-    def __init__(self):
+    def __init__(self, args):
         logging.basicConfig(level=logging.INFO)
         transformers_logger = logging.getLogger("transformers")
         transformers_logger.setLevel(logging.WARNING)

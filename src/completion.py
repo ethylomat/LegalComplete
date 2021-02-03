@@ -31,7 +31,7 @@ class Completion:
         if args.model_name == "NGRAM":
             self.refmodel = NGramCompletion(self.nlp)
         elif args.model_name == "SEQ2SEQ":
-            self.refmodel = TransSeqModel()
+            self.refmodel = TransSeqModel(args)
         else:
             raise ValueError("no model with this key available: ", args.model_name)
 
