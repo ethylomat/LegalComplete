@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from simpletransformers.seq2seq import Seq2SeqArgs, Seq2SeqModel
 
-from src.utils.preprocessing import preprocess
+from src.utils.preprocessing import preprocess_fast
 
 
 class TransSeqModel:
@@ -19,7 +19,7 @@ class TransSeqModel:
         model_args.evaluate_generated_text = True
         model_args.evaluate_during_training = False
         model_args.evaluate_during_training_verbose = True
-        model_args.use_multiprocessing = True
+        model_args.use_multiprocessing = False
         self.model_args = model_args
         cuda_available = torch.cuda.is_available()
 
@@ -36,7 +36,7 @@ class TransSeqModel:
         return sum([1 if label == pred else 0 for label, pred in zip(labels, preds)])
 
     def preprocess(self, data):
-        data = preprocess(data)
+        data = preprocess_fast(data)
         data = data.filter(["sentence", "reference"])
         data = data.rename(
             columns={"sentence": "input_text", "reference": "target_text"}
