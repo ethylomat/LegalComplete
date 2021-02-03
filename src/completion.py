@@ -14,6 +14,7 @@ from rich.table import Table
 from tqdm import tqdm
 
 from src.completion_n_gram import NGramCompletion
+from src.models.transformers_seq2seq import TransSeqModel
 from src.utils.common import read_csv, split_dataframe
 from src.utils.preprocessing import build_pipeline, preprocess
 from src.utils.retrieve import download_dataset, get_dataset_info
@@ -24,14 +25,15 @@ class Completion:
     Completion base class
     """
 
-    def __init__(self, model_name: str = "NGRAM"):
+    def __init__(self, args):
 
         self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
-        self.model_name = model_name
-        if model_name == "NGRAM":
+        if args.model_name == "NGRAM":
             self.refmodel = NGramCompletion(self.nlp)
+        elif args.model_name == "SEQ2SEQ":
+            self.refmodel = TransSeqModel()
         else:
-            raise ValueError("no model with this key available: ", model_name)
+            raise ValueError("no model with this key available: ", args.model_name)
 
     def feed_data(self, filename: str = "", key: str = ""):
         """
@@ -93,7 +95,7 @@ def evaluate_references(data_test: pd.DataFrame, refmodel, nlp) -> Dict:
     data_test = preprocess(data_test, nlp=nlp, label="test set")
 
     print("\nEvaluating ...")
-    batch_suggestions = refmodel.batch_evaluate(data_test, 3)
+    batch_suggestions = refmodel.batch_predict(data_test, 3)
 
     # compute metrics
     for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):

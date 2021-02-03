@@ -37,7 +37,7 @@ class TestEvaluation(unittest.TestCase):
         target = "§ 133 Abs. 6 VwGO"
 
         class MockedModel:
-            def batch_evaluate(input_x, num_suggestions):
+            def batch_predict(input_x, num_suggestions):
                 results = ["" for i in range(num_suggestions)]
                 results[0] = target
                 print(results)
