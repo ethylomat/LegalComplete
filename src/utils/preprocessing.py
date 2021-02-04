@@ -84,9 +84,10 @@ def preprocess_fast(df, nlp=None, label=None):
     def matcher_df(text):
         for match in re.finditer(reference_pattern, text):
             start, end = match.span()
-            sentence = text[: start - 1]
+
+            sentence = text[max(0, start - 100) : start - 1]
             reference = text[start:end]
-            sentences.append(sentence)
+            sentences.append(nlp(sentence))
             references.append(reference)
 
     df["text"] = df["text"].apply(lambda x: re.sub(r"[ ]+", " ", x.replace("\n", " ")))

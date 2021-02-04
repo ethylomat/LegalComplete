@@ -4,12 +4,7 @@ Every module or package it relies on has to be imported at the beginning.
 """
 import argparse
 
-from src.completion import (
-    Completion,
-    evaluate_references,
-    evaluate_trigger,
-    print_metrics,
-)
+from src.completion import Completion, print_metrics
 
 
 def parse_arguments():
@@ -36,6 +31,6 @@ if __name__ == "__main__":
     if not args.dont_train:
         c.train_data()
     if not args.dont_eval:
-        metrics = evaluate_references(c.data_test, c.refmodel, c.nlp)
+        metrics = c.evaluate_references(c.data_test)
         print_metrics(metrics)
-        evaluate_trigger(c.data_test, c.refmodel, c.nlp)
+        c.evaluate_trigger(c.data_test)

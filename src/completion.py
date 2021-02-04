@@ -16,7 +16,7 @@ from tqdm import tqdm
 from src.completion_n_gram import NGramCompletion
 from src.models.transformers_seq2seq import TransSeqModel
 from src.utils.common import read_csv, split_dataframe
-from src.utils.preprocessing import build_pipeline, preprocess
+from src.utils.preprocessing import build_pipeline, preprocess, preprocess_fast
 from src.utils.retrieve import download_dataset, get_dataset_info
 
 
@@ -30,8 +30,11 @@ class Completion:
         if args.model_name == "NGRAM":
             self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
             self.refmodel = NGramCompletion(self.nlp)
+            self.preprocess = preprocess
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
+            self.nlp = None
+            self.preprocess = preprocess_fast
         else:
             raise ValueError("no model with this key available: ", args.model_name)
 
@@ -59,6 +62,10 @@ class Completion:
         )
 
     def train_data(self):
+        self.data_train = self.preprocess(
+            self.data_train, nlp=self.nlp, label="training set"
+        )
+        self.data_dev = self.preprocess(self.data_dev, nlp=self.nlp, label="dev set")
         self.refmodel.train(self.data_train, self.data_dev)
 
     def __str__(self):
@@ -73,99 +80,95 @@ class Completion:
             self.data_dev.shape[0],
         )
 
+    def evaluate_references(self, data_test: pd.DataFrame) -> Dict:
+        """
+        Method for evaluation of suggestions.
+        Prints the amounts of correct suggestions based on the test set.
+        Considering the suggestion being suggested at the top 3 suggestions.
+        Args:
+          data_test: data for evaluation
+        Returns:
+          metrics: dict containing first, three, incorrect, overall_count and more
+        """
 
-def evaluate_references(data_test: pd.DataFrame, refmodel, nlp) -> Dict:
-    """
-    Method for evaluation of suggestions.
-    Prints the amounts of correct suggestions based on the test set.
-    Considering the suggestion being suggested at the top 3 suggestions.
-    Args:
-      data_test: data for evaluation
-      refmodel: reference prediction model
-      nlp: spacy pipeline
-    Returns:
-      metrics: dict containing first, three, incorrect, overall_count and more
-    """
+        first = 0
+        three = 0
+        incorrect = 0
+        failed = 0
 
-    first = 0
-    three = 0
-    incorrect = 0
-    failed = 0
+        data_test = self.preprocess(data_test, nlp=self.nlp, label="eval data")
 
-    data_test = preprocess(data_test, nlp=nlp, label="test set")
+        print("\nEvaluating ...")
+        batch_suggestions = self.refmodel.batch_predict(data_test, 3)
 
-    print("\nEvaluating ...")
-    batch_suggestions = refmodel.batch_predict(data_test, 3)
-
-    # compute metrics
-    for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):
-        y = test_sample["reference"]
-        if len(suggestions) > 0:
-            if y == suggestions[0]:
-                first += 1
-            if y in suggestions:
-                three += 1
-            else:
-                incorrect += 1
-        else:
-            failed += 1
-
-    overall_count = three + incorrect + failed
-    metrics = {
-        "overall_count": overall_count,
-        "first": first,
-        "three": three,
-        "incorrect": incorrect,
-        "failed": failed,
-    }
-    return metrics
-
-
-def evaluate_trigger(data_test, refmodel, nlp):
-
-    data_test = preprocess(data_test, nlp=nlp, label="test set")
-    refmodel.find_ngrams(data_test)
-    refmodel.find_bigrams(data_test, test=True)
-    correct_trigger = 0
-    false_trigger = 0
-    TRIGGER_THRESHOLD = 0.9
-    for test_sample in data_test.iloc:
-        sample = test_sample["ngram no sw"]
-        bigrams = zip(sample[:-1], sample[1:])
-        for bigram in bigrams:
-            x = bigram[:1]
-            y = bigram[-1:]
-
-            trigger_prob = refmodel.get_trigger_prob(x)
-            if trigger_prob >= TRIGGER_THRESHOLD:
-                if y[0].startswith("§"):
-                    correct_trigger += 1
+        # compute metrics
+        for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):
+            y = test_sample["reference"]
+            if len(suggestions) > 0:
+                if y == suggestions[0]:
+                    first += 1
+                if y in suggestions:
+                    three += 1
                 else:
-                    false_trigger += 1
-    overall_trigger = correct_trigger + false_trigger
-    table = Table(
-        title="Evaluation results:",
-        title_justify="left",
-        show_header=False,
-        show_lines=False,
-        box=box.ASCII_DOUBLE_HEAD,
-    )
-    if overall_trigger == 0:
-        raise Exception("trigger never triggered")
-    else:
-        table.add_row(
-            "correct triggered",
-            f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
+                    incorrect += 1
+            else:
+                failed += 1
+
+        overall_count = three + incorrect + failed
+        metrics = {
+            "overall_count": overall_count,
+            "first": first,
+            "three": three,
+            "incorrect": incorrect,
+            "failed": failed,
+        }
+        return metrics
+
+    def evaluate_trigger(self, data_test):
+
+        data_test = self.preprocess(data_test, nlp=self.nlp, label="test set")
+        self.refmodel.find_ngrams(data_test)
+        self.refmodel.find_bigrams(data_test, test=True)
+        correct_trigger = 0
+        false_trigger = 0
+        TRIGGER_THRESHOLD = 0.9
+        for test_sample in data_test.iloc:
+            sample = test_sample["ngram no sw"]
+            bigrams = zip(sample[:-1], sample[1:])
+            for bigram in bigrams:
+                x = bigram[:1]
+                y = bigram[-1:]
+
+                trigger_prob = self.refmodel.get_trigger_prob(x)
+                if trigger_prob >= TRIGGER_THRESHOLD:
+                    if y[0].startswith("§"):
+                        correct_trigger += 1
+                    else:
+                        false_trigger += 1
+        overall_trigger = correct_trigger + false_trigger
+        table = Table(
+            title="Evaluation results:",
+            title_justify="left",
+            show_header=False,
+            show_lines=False,
+            box=box.ASCII_DOUBLE_HEAD,
         )
-        table.add_row(
-            "false triggered",
-            f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
-        )
-        table.add_row(
-            "overall triggered",
-            f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
-        )
-        print(table)
+        if overall_trigger == 0:
+            raise Exception("trigger never triggered")
+        else:
+            table.add_row(
+                "correct triggered",
+                f"{correct_trigger} ({correct_trigger / overall_trigger:2.5f})",
+            )
+            table.add_row(
+                "false triggered",
+                f"{false_trigger} ({false_trigger / overall_trigger:2.5f})",
+            )
+            table.add_row(
+                "overall triggered",
+                f"{overall_trigger} ({overall_trigger / overall_trigger:2.5f})",
+            )
+            print(table)
 
 
 def print_metrics(metrics):
