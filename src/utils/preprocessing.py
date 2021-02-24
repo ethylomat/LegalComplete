@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from src.utils.common import load_spacy_model, read_csv
 from src.utils.matcher import ReferenceMatcher
+from src.utils.regular_expressions import reference_pattern
 
 MODULE_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(MODULE_ROOT)
@@ -75,3 +76,21 @@ def preprocess(df, nlp=None, label: str = ""):
         sentence_reference_pairs, columns=["sentence", "reference"]
     )
     return sentence_reference_df
+
+
+def preprocess_fast(df, nlp=None, label=None):
+    sentences, references = [], []
+
+    def matcher_df(text):
+        for match in re.finditer(reference_pattern, text):
+            start, end = match.span()
+
+            sentence = text[max(0, start - 100) : start - 1]
+            reference = text[start:end]
+            sentences.append(nlp(sentence))
+            references.append(reference)
+
+    df["text"] = df["text"].apply(lambda x: re.sub(r"[ ]+", " ", x.replace("\n", " ")))
+    df["text"] = df["text"].apply(matcher_df)
+    pairs = pd.DataFrame({"sentence": sentences, "reference": references})
+    return pairs

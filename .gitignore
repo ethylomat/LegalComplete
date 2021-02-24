@@ -8,6 +8,8 @@
 ## Data
 *.csv
 datasets/**
+runs/
+outputs/
 
 ## Python 
 # Profiler

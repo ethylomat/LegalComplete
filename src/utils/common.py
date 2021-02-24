@@ -83,7 +83,8 @@ def split_dataframe(df, fracs=[0.8, 0.1, 0.1]):
     Returns:
     - dfs: List of Dataframes
     """
-    if frac_sum := sum(fracs) > 1:
+    frac_sum = sum(fracs)
+    if frac_sum > 1:
         fracs = [frac / frac_sum for frac in fracs]
 
     dfs = []

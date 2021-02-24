@@ -12,7 +12,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.utils.common import timer
-from src.utils.preprocessing import build_pipeline, preprocess
 from src.utils.regular_expressions import word_pattern
 from src.utils.stopwords import stopwords
 
@@ -28,8 +27,7 @@ def clean(sentence):
         cleaned: list of words (not SpaCy doc) not containing punctuation, numbers, symbols
     """
     tokens_to_remove = {"PUNCT", "NUM", "SYM"}
-    cleaned = list(filter(lambda tok: tok.pos_ not in tokens_to_remove, sentence))
-    return cleaned
+    return [word for word in sentence if word.pos_ not in tokens_to_remove]
 
 
 def clean_ngram(ngram):
@@ -90,15 +88,10 @@ class NGramCompletion:
 
     @timer
     def train(self, data_train, data_dev):
-        self.data_train, self.data_dev = data_train, data_dev
+        self.sentence_reference_train = data_train
+        self.sentence_reference_dev = data_dev
         print("\nFinding section references ...")
 
-        self.sentence_reference_train = preprocess(
-            self.data_train, nlp=self.nlp, label="training set"
-        )
-        self.sentence_reference_dev = preprocess(
-            self.data_dev, nlp=self.nlp, label="dev set"
-        )
         self.find_ngrams(self.sentence_reference_train)
         self.find_ngrams(self.sentence_reference_dev)
 
@@ -106,7 +99,7 @@ class NGramCompletion:
         self.find_bigrams(self.sentence_reference_dev, test=True)
 
     @timer
-    def batch_evaluate(
+    def batch_predict(
         self, data: pd.DataFrame, num_suggestions: int
     ) -> List[List[str]]:
         # prepare eval data
@@ -158,7 +151,6 @@ class NGramCompletion:
 
         if not self.wordlist:
             self.wordlist = []
-
         for ngram in tqdm(df["ngram"], desc="Building bigrams (with stopwords) ..."):
             self.wordlist += ngram
             for i in range(len(ngram) - 1):
