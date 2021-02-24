@@ -27,13 +27,12 @@ class Completion:
 
     def __init__(self, args):
 
+        self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
         if args.model_name == "NGRAM":
-            self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
             self.refmodel = NGramCompletion(self.nlp)
-            self.preprocess = preprocess
+            self.preprocess = preprocess_fast
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
-            self.nlp = None
             self.preprocess = preprocess_fast
         else:
             raise ValueError("no model with this key available: ", args.model_name)

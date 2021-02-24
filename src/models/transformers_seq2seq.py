@@ -14,16 +14,16 @@ class TransSeqModel:
         transformers_logger.setLevel(logging.WARNING)
 
         model_args = Seq2SeqArgs()
-        model_args.num_train_epochs = 50
+        model_args.num_train_epochs = 1
         model_args.no_save = True
-        model_args.train_batch_size = 8
+        model_args.train_batch_size = 4
         model_args.evaluate_generated_text = True
         model_args.evaluate_during_training = False
         model_args.evaluate_generated_text = False
         model_args.evaluate_during_training_verbose = True
         model_args.use_multiprocessing = False
-        model_args.max_seq_length = 10
-        model_args.max_length = 15
+        model_args.max_seq_length = 5
+        model_args.max_length = 6
         model_args.overwrite_output_dir = True
         self.model_args = model_args
         cuda_available = torch.cuda.is_available()
@@ -60,7 +60,9 @@ class TransSeqModel:
     def batch_predict(self, data, beam_search_width):
         results = []
         for el in data.iloc:
-            results.append(self.predict(el["sentence"], beam_search_width))
+            print("sent is:", el["sentence"].text)
+            print(type(el["sentence"].text), "was type")
+            results.append(self.predict(el["sentence"].text, beam_search_width))
             print(el["sentence"], "->", results[-1])
         return results
 
