@@ -14,51 +14,57 @@ from rich.table import Table
 from tqdm import tqdm
 
 from src.completion_n_gram import NGramCompletion
+from src.models.lstm import LstmModel
 from src.models.transformers_seq2seq import TransSeqModel
 from src.utils.common import read_csv, split_dataframe
 from src.utils.preprocessing import build_pipeline, preprocess, preprocess_fast
 from src.utils.retrieve import download_dataset, get_dataset_info
 
 
-class Completion:
+def feed_data(filename: str = "", key: str = ""):
     """
-    Completion base class
+    Method for reading raw files into datasets
+
+    Args:
+        filename: relative filename in data directory
+        key: alternative - give dataset key to receive automatically
     """
 
-    def __init__(self, args):
+    # If key is provided instead of filename (-> filename is overwritten)
+    if key:
+        dataset_info = get_dataset_info(key)
+        download_dataset(dataset_info)
+        filename = dataset_info["extracted"]
+
+    full_df = read_csv(filename)
+
+    # Splitting dataframe into different sets
+    return split_dataframe(full_df, fracs=[0.80, 0.10, 0.10])
+
+
+class Completion:
+    """
+    All models can be trained and evaluated by
+    creating an completion object with the respective model variant
+    """
+
+    def __init__(self, args, data_train, data_dev, data_test):
+        self.data_train = data_train
+        self.data_dev = data_dev
+        self.data_test = data_test
 
         self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
         if args.model_name == "NGRAM":
             self.refmodel = NGramCompletion(self.nlp)
-            self.preprocess = preprocess_fast
+            self.preprocess = preprocess
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
             self.preprocess = preprocess_fast
+        elif args.model_name == "LSTM":
+            self.preprocess = preprocess_fast
+            self.refmodel = LstmModel(args, self.data_train)
         else:
             raise ValueError("no model with this key available: ", args.model_name)
-
-    def feed_data(self, filename: str = "", key: str = ""):
-        """
-        Method for reading raw files into datasets
-
-        Args:
-            filename: relative filename in data directory
-            key: alternative - give dataset key to receive automatically
-        """
-
-        # If key is provided instead of filename (-> filename is overwritten)
-        if key:
-            dataset_info = get_dataset_info(key)
-            download_dataset(dataset_info)
-            filename = dataset_info["extracted"]
-
-        # TODO: Catch FileNotFoundError
-        full_df = read_csv(filename)
-
-        # Splitting dataframe into different sets
-        self.data_train, self.data_dev, self.data_test = split_dataframe(
-            full_df, fracs=[0.80, 0.10, 0.10]
-        )
 
     def train_data(self):
         self.data_train = self.preprocess(
