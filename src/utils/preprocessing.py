@@ -110,8 +110,52 @@ def load_vocab(data):
     sentences = data["sentence"].to_list()
     sentences = [("<start> " + sentence.text).split(" ") for sentence in sentences]
     input_vocab = Word2Vec(sentences=sentences, vector_size=1, window=1, min_count=1).wv
-    return input_vocab, target_vocab
 
+    #refclasses = set(data["reference"].to_list())
+    ref_classes = Word2Vec(
+        sentences=data['reference'].to_list(), vector_size=1, window=1, min_count=1
+    ).wv
+
+
+    return input_vocab, target_vocab, ref_classes
+
+def cnn_generator(
+    data,
+    target_vocab,
+    target_vocab_size,
+    input_vocab,
+    input_vocab_size,
+    sentence_len):
+    start_token = word2idx(input_vocab, "<start>", input_vocab_size)
+    for sample in data.iloc:
+        sent_vectors = process_input_sample(
+            input_vocab,
+            input_vocab_size,
+            sample["sentence"].text,
+            sentence_len,
+            start_token,
+        )
+
+        ref_vectors = word2onehot(target_vocab, sample['reference'], target_vocab_size)
+        print("vect shape is ", ref_vectors.shape)
+        yield sent_vectors, ref_vectors
+
+def cnn_preprocessing(
+    data,
+    target_vocab,
+    target_vocab_size,
+    input_vocab,
+    input_vocab_size,
+    sentence_len):
+    MAX_SEQUENCE_LENGTH = 12
+    tokenizer = Tokenizer(num_words=10000, filters='', lower=False)
+    tokenizer.fit_on_texts(df['sentence'].text)
+    word_index = tokenizer.word_index
+    X = tokenizer.texts_to_sequences(df['sentence'].text)
+    X = pad_sequences(X, maxlen=MAX_SEQUENCE_LENGTH)
+    
+    Y = df['reference'].text
+    return (X, Y)
 
 def seq2seq_generator(
     data,
@@ -190,7 +234,10 @@ def word2idx(vocab, word, tmp=None):
 
 
 def idx2word(vocab, idx):
-    return vocab.index_to_key[idx]
+    try:
+        return vocab.index_to_key[idx]
+    except TypeError:
+        print("key: ", idx)
 
 
 def word2onehot(vocab, word, vocab_size):

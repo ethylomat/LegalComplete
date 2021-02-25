@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from src.completion_n_gram import NGramCompletion
 from src.models.lstm import LstmModel
+from src.models.cnn import CnnModel
 from src.models.transformers_seq2seq import TransSeqModel
 from src.utils.common import read_csv, split_dataframe
 from src.utils.preprocessing import (
@@ -39,6 +40,11 @@ class Completion:
             self.refmodel = NGramCompletion(self.nlp)
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
+        elif args.model_name == "CNN":
+            self.refmodel = CnnModel(
+                args, self.data_train, self.input_vocab, self.target_vocab, 
+                self.ref_classes
+            )
         elif args.model_name == "LSTM":
             self.refmodel = LstmModel(
                 args, self.data_train, self.input_vocab, self.target_vocab
@@ -71,7 +77,7 @@ class Completion:
         )  # TODO Remove
 
         full_df = self.preprocess(full_df, nlp=self.nlp, label="full df")
-        self.input_vocab, self.target_vocab = load_vocab(full_df)
+        self.input_vocab, self.target_vocab, self.ref_classes = load_vocab(full_df)
 
         # Splitting dataframe into different sets
         self.data_train, self.data_test, self.data_dev = split_dataframe(
