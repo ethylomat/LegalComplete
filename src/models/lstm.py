@@ -7,6 +7,7 @@ from keras.models import Model
 from src.utils.preprocessing import (
     idx2word,
     preprocess_fast,
+    process_input_sample,
     seq2seq_generator,
     word2idx,
     word2onehot,
@@ -40,11 +41,6 @@ class LstmModel:
 
         self.num_encoder_tokens = self.input_vocab.vectors.shape[0]
         self.num_decoder_tokens = self.target_vocab.vectors.shape[0]
-        print(
-            "vector sahpes are",
-            self.input_vocab.vectors.shape,
-            self.input_vocab.index_to_key[:100],
-        )
         print("finished init setup")
         self.model = self.build_model()
         print("finished building model")
@@ -53,9 +49,7 @@ class LstmModel:
         """ builds and returns encoder decoder tensorflow model"""
 
         encoder_inputs = Input(shape=(None,), name="encoder_input")
-        x = Embedding(
-            self.num_encoder_tokens, self.latent_dim, input_length=self.max_sentence_len
-        )(encoder_inputs)
+        x = Embedding(self.num_encoder_tokens, self.latent_dim)(encoder_inputs)
         x, state_h, state_c = LSTM(self.latent_dim, return_state=True)(x)
         encoder_states = [state_h, state_c]
 
@@ -65,34 +59,34 @@ class LstmModel:
             self.num_decoder_tokens, self.latent_dim, input_length=self.max_sentence_len
         )(decoder_inputs)
 
-        decoder_lstm = LSTM(self.latent_dim, return_sequences=True, return_state=True)
+        decoder_lstm = LSTM(self.latent_dim, return_sequences=False, return_state=True)
         decoder_outputs, _, _ = decoder_lstm(x, initial_state=encoder_states)
         decoder_dense = Dense(self.num_decoder_tokens, activation="softmax")
         decoder_outputs = decoder_dense(decoder_outputs)
 
-        # Define the model that will turn
-        # `encoder_input_data` & `decoder_input_data` into `decoder_target_data`
         model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
         print(model.summary())
-        decoder_lstm = LSTM(self.latent_dim, return_sequences=True, return_state=True)
-
-        # Note that `decoder_target_data` needs to be one-hot encoded,
-        # rather than sequences of integers like `decoder_input_data`!
 
         # inference setup
+        decoder_lstm = LSTM(self.latent_dim, return_sequences=False, return_state=True)
+
         self.encoder_model = Model(encoder_inputs, encoder_states)
 
-        decoder_state_input_h = Input(shape=(self.latent_dim,))
-        decoder_state_input_c = Input(shape=(self.latent_dim,))
+        decoder_state_input_h = Input(shape=(self.latent_dim,), name="decoder_state_h")
+        decoder_state_input_c = Input(shape=(self.latent_dim,), name="decoder_state_c")
         decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
         decoder_outputs, state_h, state_c = decoder_lstm(
             x, initial_state=decoder_states_inputs
         )
-
         decoder_states = [state_h, state_c]
         decoder_outputs = decoder_dense(decoder_outputs)
         self.decoder_model = Model(
-            [decoder_inputs] + decoder_states_inputs, [decoder_outputs] + decoder_states
+            {
+                "decoder_inputs": decoder_inputs,
+                "decode_state_h": decoder_state_input_h,
+                "decoder_state_c": decoder_state_input_c,
+            },
+            [decoder_outputs] + decoder_states,
         )
 
         return model
@@ -104,6 +98,8 @@ class LstmModel:
             self.num_decoder_tokens,
             self.input_vocab,
             self.num_encoder_tokens,
+            self.max_sentence_len,
+            self.max_decoder_seq_length,
         )
 
     def convert_to_fixed_length_input(self, data):
@@ -111,11 +107,13 @@ class LstmModel:
 
     def train(self, train_df, eval_df):
         train_data = self.preprocess(train_df)
-        # eval_data = self.preprocess(eval_df) # TODO
+        eval_data = self.preprocess(eval_df)
 
-        self.model.compile(optimizer="rmsprop", loss="categorical_crossentropy")
+        self.model.compile(optimizer="rmsprop", loss="sparse_categorical_crossentropy")
         self.model.fit(
             train_data,
+            steps_per_epoch=5,
+            validation_data=eval_data,
             epochs=self.epochs,
         )
 
@@ -137,21 +135,43 @@ class LstmModel:
 
     def decode_sequence(self, input_seq):
         # Encode the input as state vectors.
-        states_value = self.encoder_model.predict(input_seq)
-
+        start_token = word2onehot(self.input_vocab, "<start>", self.num_encoder_tokens)
+        input_vector = process_input_sample(
+            self.input_vocab,
+            self.num_encoder_tokens,
+            input_seq,
+            self.max_sentence_len,
+            start_token,
+        )
+        print("in vect: ", input_vector.shape)
+        state_c, state_h = self.encoder_model.predict([input_vector], batch_size=1)
+        """
         # Generate empty target sequence of length 1.
         target_seq = np.zeros((1, 1, self.num_decoder_tokens))
         # Populate the first character of target sequence with the start character.
-        target_seq[0, 0, word2idx(self.target_vocab, "\t")] = 1.0
+        target_seq[0, 0, word2idx(self.target_vocab, "§")] = 1.0
+        """
+        decoder_input = word2onehot(
+            self.target_vocab, "<start>", self.num_decoder_tokens
+        )
+        decoder_input = np.reshape(decoder_input, (1, 1, self.num_decoder_tokens))
 
         # Sampling loop for a batch of sequences
         # (to simplify, here we assume a batch of size 1).
         stop_condition = False
         decoded_sentence = ""
+        print(self.encoder_model.summary())
+        state_c = np.reshape(state_c, (1, self.max_decoder_seq_length, self.latent_dim))
+        state_h = np.reshape(state_h, (1, self.max_decoder_seq_length, self.latent_dim))
+        x = {
+            "decoder_inputs": decoder_input,
+            "decode_state_h": state_h,
+            "decoder_state_c": state_c,
+        }
+
+        print(self.decoder_model.summary())
         while not stop_condition:
-            output_tokens, h, c = self.decoder_model.predict(
-                [target_seq] + states_value
-            )
+            output_tokens, h, c = self.decoder_model.predict(x, batch_size=1)
 
             # Sample a token
             sampled_token_index = np.argmax(output_tokens[0, -1, :])
@@ -161,7 +181,7 @@ class LstmModel:
             # Exit condition: either hit max length
             # or find stop character.
             if (
-                sampled_char == "\n"
+                sampled_char == "<end>"
                 or len(decoded_sentence) > self.max_decoder_seq_length
             ):
                 stop_condition = True
@@ -171,6 +191,6 @@ class LstmModel:
             target_seq[0, 0, sampled_token_index] = 1.0
 
             # Update states
-            states_value = [h, c]
+            state_c, state_h = c, h
 
         return decoded_sentence

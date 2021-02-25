@@ -101,59 +101,85 @@ def preprocess_fast(df, nlp=None, label=None):
 def load_vocab(data):
     # a hacky way to get a onehot encoding for words from the target domain
     references = data["reference"].to_list()
-    references = [ref + " <end>" for ref in references]
+    references = ["<start> " + ref + " <end>" for ref in references]
     references = [reference.split(" ") for reference in references]
     target_vocab = Word2Vec(
         sentences=references, vector_size=1, window=1, min_count=1
     ).wv
 
     sentences = data["sentence"].to_list()
-    sentences = [sentence.text.split(" ") for sentence in sentences]
+    sentences = [("<start> " + sentence.text).split(" ") for sentence in sentences]
     input_vocab = Word2Vec(sentences=sentences, vector_size=1, window=1, min_count=1).wv
     return input_vocab, target_vocab
 
 
 def seq2seq_generator(
-    data, target_vocab, target_vocab_size, input_vocab, input_vocab_size
+    data,
+    target_vocab,
+    target_vocab_size,
+    input_vocab,
+    input_vocab_size,
+    sentence_len,
+    decoder_sentence_len,
 ):
-    sentence_len = 7
-    decoder_sentence_len = 7
     target_tensor_shape = (decoder_sentence_len, target_vocab_size)
     end_token = word2onehot(target_vocab, "<end>", target_vocab_size)
+    start_token = word2onehot(input_vocab, "<start>", input_vocab_size)
+    start_target_token = word2onehot(target_vocab, "<start>", target_vocab_size)
     for sample in data.iloc:
 
-        sentence = sample["sentence"].text.split(" ")
-        sent_vectors = [
-            word2onehot(input_vocab, word, input_vocab_size) for word in sentence
-        ]
-        # crop to fixed number of input words
-        sent_vectors = sent_vectors[: min(len(sent_vectors), sentence_len)]
-        # preppend with padding token if sentence is to short
-        sent_vectors = np.array(sent_vectors)
+        sent_vectors = process_input_sample(
+            input_vocab,
+            input_vocab_size,
+            sample["sentence"].text,
+            sentence_len,
+            start_token,
+        )
 
         reference = sample["reference"].split(" ")
         ref_vectors = [
             word2onehot(target_vocab, word, target_vocab_size) for word in reference
         ]
+        # crop to fixed number of input words
+        ref_vectors = ref_vectors[
+            : decoder_sentence_len - 1
+        ]  # -1 because of start token
+        padding_target = decoder_sentence_len - 1 - len(ref_vectors)
 
-        padding_target = decoder_sentence_len - min(
-            len(ref_vectors), decoder_sentence_len
+        ref_vectors = (
+            [start_target_token]
+            + ref_vectors
+            + [end_token for i in range(padding_target)]
         )
-
-        ref_vectors_shifted = ref_vectors[1:] + [
-            end_token for i in range(padding_target + 1)
-        ]
-        ref_vectors = ref_vectors + [end_token for i in range(padding_target)]
+        ref_vectors_shifted = ref_vectors[1:] + [end_token]
 
         ref_vectors = np.array(ref_vectors)
         ref_vectors_shifted = np.array(ref_vectors_shifted)
 
+        ref_vectors = np.reshape(ref_vectors, target_tensor_shape)
         ref_vectors_shifted = np.reshape(ref_vectors_shifted, target_tensor_shape)
-        sent_vectors = np.reshape(sent_vectors, (sentence_len, input_vocab_size))
-        print("shape is ", ref_vectors.shape, target_vocab_size)
-        print("shape is ", ref_vectors_shifted.shape, target_vocab_size)
         x = {"encoder_input": sent_vectors, "decoder_input": ref_vectors}
         yield (x, ref_vectors_shifted)
+
+
+def process_input_sample(input_vocab, input_vocab_size, text, sentence_len, pad_token):
+    """ performs padding, crops to fixed number of words and returns np.array"""
+    sentence = text.split(" ")
+    sent_vectors = [word2idx(input_vocab, word, input_vocab_size) for word in sentence]
+
+    sent_vectors = sent_vectors[:sentence_len]
+    # preppend with padding token if sentence is to short
+    input_pad_length = sentence_len - len(sent_vectors)
+    sent_vectors = [pad_token for i in range(input_pad_length)] + sent_vectors
+    sent_vectors = np.array(sent_vectors)
+    sent_vectors = np.reshape(sent_vectors, (sentence_len))
+    return sent_vectors
+
+
+def process_target_sample(
+    target_vocab, target_vocab_size, text, decoder_sentence_len, pad_token
+):
+    """ performs padding, crops to fixed number of words and returns np.array"""
 
 
 def word2idx(vocab, word, tmp=None):
