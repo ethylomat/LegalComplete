@@ -4,7 +4,7 @@ Every module or package it relies on has to be imported at the beginning.
 """
 import argparse
 
-from src.completion import Completion, feed_data, print_metrics
+from src.completion import Completion, print_metrics
 
 
 def parse_arguments():
@@ -26,8 +26,7 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    train, test, dev = feed_data(key=args.dataset)
-    c = Completion(args, train, test, dev)
+    c = Completion(args)
     if not args.dont_train:
         c.train_data()
     if not args.dont_eval:

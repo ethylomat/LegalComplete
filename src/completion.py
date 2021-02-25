@@ -17,29 +17,13 @@ from src.completion_n_gram import NGramCompletion
 from src.models.lstm import LstmModel
 from src.models.transformers_seq2seq import TransSeqModel
 from src.utils.common import read_csv, split_dataframe
-from src.utils.preprocessing import build_pipeline, preprocess, preprocess_fast
+from src.utils.preprocessing import (
+    build_pipeline,
+    load_vocab,
+    preprocess,
+    preprocess_fast,
+)
 from src.utils.retrieve import download_dataset, get_dataset_info
-
-
-def feed_data(filename: str = "", key: str = ""):
-    """
-    Method for reading raw files into datasets
-
-    Args:
-        filename: relative filename in data directory
-        key: alternative - give dataset key to receive automatically
-    """
-
-    # If key is provided instead of filename (-> filename is overwritten)
-    if key:
-        dataset_info = get_dataset_info(key)
-        download_dataset(dataset_info)
-        filename = dataset_info["extracted"]
-
-    full_df = read_csv(filename)
-
-    # Splitting dataframe into different sets
-    return split_dataframe(full_df, fracs=[0.80, 0.10, 0.10])
 
 
 class Completion:
@@ -48,29 +32,57 @@ class Completion:
     creating an completion object with the respective model variant
     """
 
-    def __init__(self, args, data_train, data_dev, data_test):
-        self.data_train = data_train
-        self.data_dev = data_dev
-        self.data_test = data_test
-
+    def __init__(self, args):
         self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
+        self.feed_data(args, key=args.dataset)
         if args.model_name == "NGRAM":
             self.refmodel = NGramCompletion(self.nlp)
-            self.preprocess = preprocess
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
-            self.preprocess = preprocess_fast
         elif args.model_name == "LSTM":
-            self.preprocess = preprocess_fast
-            self.refmodel = LstmModel(args, self.data_train)
+            self.refmodel = LstmModel(
+                args, self.data_train, self.input_vocab, self.target_vocab
+            )
         else:
             raise ValueError("no model with this key available: ", args.model_name)
 
+    def feed_data(self, args, filename: str = "", key: str = ""):
+        """
+        Method for reading raw files into datasets
+
+        Args:
+            filename: relative filename in data directory
+            key: alternative - give dataset key to receive automatically
+        """
+
+        # If key is provided instead of filename (-> filename is overwritten)
+        if key:
+            dataset_info = get_dataset_info(key)
+            download_dataset(dataset_info)
+            filename = dataset_info["extracted"]
+
+        full_df = read_csv(filename)
+        if args.model_name == "NGRAM":
+            self.preprocess = preprocess
+        else:
+            self.preprocess = preprocess_fast
+        full_df.drop(
+            full_df.index[: len(full_df) // 10 * 9], 0, inplace=True
+        )  # TODO Remove
+
+        full_df = self.preprocess(full_df, nlp=self.nlp, label="full df")
+        self.input_vocab, self.target_vocab = load_vocab(full_df)
+
+        # Splitting dataframe into different sets
+        self.data_train, self.data_test, self.data_dev = split_dataframe(
+            full_df, fracs=[0.80, 0.10, 0.10]
+        )
+
     def train_data(self):
-        self.data_train = self.preprocess(
+        """self.data_train = self.preprocess(
             self.data_train, nlp=self.nlp, label="training set"
         )
-        self.data_dev = self.preprocess(self.data_dev, nlp=self.nlp, label="dev set")
+        self.data_dev = self.preprocess(self.data_dev, nlp=self.nlp, label="dev set")"""
         self.refmodel.train(self.data_train, self.data_dev)
 
     def __str__(self):
@@ -101,8 +113,6 @@ class Completion:
         incorrect = 0
         failed = 0
 
-        data_test = self.preprocess(data_test, nlp=self.nlp, label="eval data")
-
         print("\nEvaluating ...")
         batch_suggestions = self.refmodel.batch_predict(data_test, 3)
 
@@ -131,7 +141,6 @@ class Completion:
 
     def evaluate_trigger(self, data_test):
 
-        data_test = self.preprocess(data_test, nlp=self.nlp, label="test set")
         self.refmodel.find_ngrams(data_test)
         self.refmodel.find_bigrams(data_test, test=True)
         correct_trigger = 0
