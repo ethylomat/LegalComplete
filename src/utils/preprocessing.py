@@ -111,13 +111,19 @@ def load_vocab(data):
     sentences = [("<start> " + sentence.text).split(" ") for sentence in sentences]
     input_vocab = Word2Vec(sentences=sentences, vector_size=1, window=1, min_count=1).wv
 
-    #refclasses = set(data["reference"].to_list())
     ref_classes = Word2Vec(
-        sentences=data['reference'].to_list(), vector_size=1, window=1, min_count=1
+        sentences=[data["reference"].to_list()],
+        vector_size=1,
+        window=1,
+        min_count=10,
     ).wv
+    ref_classes
+    import pdb
 
+    # pdb.set_trace()
 
     return input_vocab, target_vocab, ref_classes
+
 
 def cnn_generator(
     data,
@@ -125,37 +131,44 @@ def cnn_generator(
     target_vocab_size,
     input_vocab,
     input_vocab_size,
-    sentence_len):
+    sentence_len,
+    batch_size,
+):
     start_token = word2idx(input_vocab, "<start>", input_vocab_size)
-    for sample in data.iloc:
-        sent_vectors = process_input_sample(
-            input_vocab,
-            input_vocab_size,
-            sample["sentence"].text,
-            sentence_len,
-            start_token,
-        )
 
-        ref_vectors = word2onehot(target_vocab, sample['reference'], target_vocab_size)
-        print("vect shape is ", ref_vectors.shape)
-        yield sent_vectors, ref_vectors
+    def chunker(seq, size):
+        return (seq[pos : pos + size] for pos in range(0, len(seq) - 1, size))
 
-def cnn_preprocessing(
-    data,
-    target_vocab,
-    target_vocab_size,
-    input_vocab,
-    input_vocab_size,
-    sentence_len):
-    MAX_SEQUENCE_LENGTH = 12
-    tokenizer = Tokenizer(num_words=10000, filters='', lower=False)
-    tokenizer.fit_on_texts(df['sentence'].text)
-    word_index = tokenizer.word_index
-    X = tokenizer.texts_to_sequences(df['sentence'].text)
-    X = pad_sequences(X, maxlen=MAX_SEQUENCE_LENGTH)
-    
-    Y = df['reference'].text
-    return (X, Y)
+    # loop through dataset endless times
+    while True:
+        for chunk in chunker(data, batch_size):
+            ref_vectors = []
+            sent_vectors = []
+
+            for j in range(len(chunk)):
+                sample = chunk.iloc[j]
+                # sent_vectors = process_input_sample(
+
+                sent_vectors.append(
+                    process_input_sample(
+                        input_vocab,
+                        input_vocab_size,
+                        sample["sentence"].text,
+                        sentence_len,
+                        start_token,
+                    )
+                )
+
+                # ref_vectors = word2onehot(target_vocab, sample['reference'], target_vocab_size)
+                ref_vectors.append(
+                    word2onehot(target_vocab, sample["reference"], target_vocab_size)
+                )
+            # ref_vectors = np.reshape(ref_vectors, (batch_size, -1,))
+            # sent_vectors = np.reshape(sent_vectors, (batch_size, -1,))
+            ref_vectors = np.array(ref_vectors)
+            sent_vectors = np.array(sent_vectors)
+            yield sent_vectors, ref_vectors
+
 
 def seq2seq_generator(
     data,
@@ -227,10 +240,15 @@ def process_target_sample(
 
 
 def word2idx(vocab, word, tmp=None):
-    try:
+    # try:
+    #     return vocab.key_to_index[word]
+    # except KeyError:
+    #     print("Error: not in vocab: ", word)
+    #     return vocab.key_to_index["."]
+    if word not in vocab.index_to_key:
+        return vocab.key_to_index["§ 17 Abs. 1 Satz 2 FStrG"]
+    else:
         return vocab.key_to_index[word]
-    except KeyError:
-        return vocab.key_to_index["."]
 
 
 def idx2word(vocab, idx):
