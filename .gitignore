@@ -10,6 +10,7 @@
 datasets/**
 runs/
 outputs/
+wandb/
 
 ## Python 
 # Profiler

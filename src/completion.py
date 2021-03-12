@@ -76,9 +76,9 @@ class Completion:
             self.preprocess = preprocess
         else:
             self.preprocess = preprocess_fast
-        full_df.drop(
-            full_df.index[: len(full_df) // 2], 0, inplace=True
-        )  # reduce dataset for fast debugging TODO Remove
+        # full_df.drop(
+        #     full_df.index[: len(full_df) // 2], 0, inplace=True
+        # )  # reduce dataset for fast debugging TODO Remove
 
         full_df = self.preprocess(full_df, nlp=self.nlp, label="full df")
         self.input_vocab, self.target_vocab, self.ref_classes = load_vocab(full_df)

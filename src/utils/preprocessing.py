@@ -115,7 +115,7 @@ def load_vocab(data):
         sentences=[data["reference"].to_list()],
         vector_size=1,
         window=1,
-        min_count=10,
+        min_count=3,
     ).wv
     ref_classes
     import pdb
@@ -240,13 +240,8 @@ def process_target_sample(
 
 
 def word2idx(vocab, word, tmp=None):
-    # try:
-    #     return vocab.key_to_index[word]
-    # except KeyError:
-    #     print("Error: not in vocab: ", word)
-    #     return vocab.key_to_index["."]
     if word not in vocab.index_to_key:
-        return vocab.key_to_index["§ 17 Abs. 1 Satz 2 FStrG"]
+        return vocab.key_to_index["§ 17 Abs. 1 Satz 2 FStrG"]  # TODO replace
     else:
         return vocab.key_to_index[word]
 

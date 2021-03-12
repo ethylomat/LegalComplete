@@ -4,6 +4,10 @@ Every module or package it relies on has to be imported at the beginning.
 """
 import argparse
 
+import wandb
+
+wandb.init(project="legalcomplete")
+
 from src.completion import Completion, print_metrics
 
 

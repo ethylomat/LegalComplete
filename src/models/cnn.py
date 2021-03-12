@@ -8,6 +8,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tqdm import tqdm
 
+import wandb
 from src.utils.preprocessing import (
     cnn_generator,
     idx2word,
@@ -29,13 +30,13 @@ class CnnModel:
         self.input_vocab = input_vocab
         self.ref_classes = ref_classes
         self.batch_size = 16
-        self.epochs = 50
-        self.max_sentence_len = 8
+        self.epochs = 10
+        self.max_sentence_len = 20
         self.max_decoder_seq_length = 9
         self.steps_per_epoch = len(data_train) // self.batch_size
         self.validation_steps = len(data_test) // self.batch_size
         self.window_size = 5
-        self.latent_dim = 20
+        self.latent_dim = 10
 
         """sentences = data_train["sentence"].to_list()
         sentences = [sentence.text.split(" ") for sentence in sentences]
@@ -61,12 +62,12 @@ class CnnModel:
         x = layers.Dropout(0.4)(x)
 
         x = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(8, return_sequences=False, return_state=False)
+            tf.keras.layers.LSTM(16, return_sequences=False, return_state=False)
         )(x)
 
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.4)(x)
-        x = tf.keras.layers.Dense(128, activation="relu")(x)
+        x = tf.keras.layers.Dense(512, activation="relu")(x)
         x = layers.Dropout(0.4)(x)
         predictions = tf.keras.layers.Dense(
             self.num_decoder_tokens, activation="softmax"
@@ -94,8 +95,29 @@ class CnnModel:
         self.model.compile(
             optimizer="rmsprop", loss="categorical_crossentropy", metrics=["acc"]
         )
+        wandb_callback = wandb.keras.WandbCallback(
+            verbose=0,
+            mode="auto",
+            save_weights_only=False,
+            log_weights=False,
+            log_gradients=False,
+            save_model=True,
+            training_data=None,
+            validation_data=None,
+            labels=[],
+            data_type=None,
+            predictions=36,
+            generator=None,
+            input_type=None,
+            output_type=None,
+            log_evaluation=True,
+            log_batch_frequency=None,
+            log_best_prefix="best_",
+        )
+
         self.model.fit(
             train_data,
+            callbacks=[wandb_callback],
             batch_size=self.batch_size,
             steps_per_epoch=self.steps_per_epoch,
             validation_steps=self.validation_steps,
@@ -124,7 +146,10 @@ class CnnModel:
         prediction = self.model.predict(sent, batch_size=1)[0]
 
         # prediction_maxed = tf.argmax(prediction, axis=-1)[0]
-        max_n = np.argpartition(prediction, -beam_search_width)[-beam_search_width:]
+        max_n = list(
+            np.argpartition(prediction, -beam_search_width)[-beam_search_width:]
+        )
+        max_n.reverse()
 
         final_predicions = [idx2word(self.ref_classes, pred) for pred in max_n]
         return final_predicions
