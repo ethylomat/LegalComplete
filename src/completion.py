@@ -8,6 +8,7 @@ subsets.
 """
 from typing import Dict
 
+import numpy as np
 import pandas as pd
 from rich import box, print
 from rich.table import Table
@@ -34,7 +35,17 @@ class Completion:
     """
 
     def __init__(self, args):
-        self.nlp = build_pipeline(disable=["tagger", "parser", "ner"])
+        self.nlp = build_pipeline(
+            disable=[
+                "tagger",
+                "parser",
+                "ner",
+                "tok2vec",
+                "morphologizer",
+                "attribute_ruler",
+                "lemmatizer",
+            ]
+        )
         self.feed_data(args, key=args.dataset)
         if args.model_name == "NGRAM":
             self.refmodel = NGramCompletion(self.nlp)
@@ -107,6 +118,51 @@ class Completion:
             self.data_dev.shape[0],
         )
 
+    def print_outputs(self, data_test: pd.DataFrame, count: int):
+        """ method for visualization of model output"""
+        batch_suggestions, probabilities = self.refmodel.batch_predict(data_test, 3)
+        i = 0
+        for (suggestions, sample_probabilites, test_sample) in zip(
+            batch_suggestions, probabilities, data_test.iloc
+        ):
+            y = test_sample["reference"]
+            x = test_sample["sentence"].text
+            print("input: ", x)
+            print("ground truth: ", y)
+            for sugg, prob in zip(suggestions, sample_probabilites):
+                print("suggestion: ", prob, ": ", sugg)
+            print()
+            if i > count:
+                break
+            i += 1
+
+    def evaluate_ROC(self, data_test: pd.DataFrame):
+        import matplotlib
+        from sklearn.metrics import auc, roc_curve
+
+        matplotlib.use("TkAgg")
+        import matplotlib.pyplot as plt
+
+        words, probabilities = self.refmodel.batch_predict(data_test, 1)
+        # is list of lists with only one element
+        probabilities = [p[0] for p in probabilities]
+        words = [w[0] for w in words]
+        y_true = np.array(data_test["reference"])
+
+        # binary array whether prediction was true or false
+        x_test = np.array([prediction == gt for prediction, gt in zip(words, y_true)])
+
+        fpr_keras, tpr_keras, thresholds_keras = roc_curve(x_test, probabilities)
+        auc = auc(fpr_keras, tpr_keras)
+        plt.plot(thresholds_keras, label="thresholds")
+        plt.show()
+        plt.plot(fpr_keras, tpr_keras, label="ROC")
+        plt.plot([0, 1], [0, 1], color="navy", linestyle="--")
+        plt.xlabel("False positive rate")
+        plt.ylabel("True positive rate")
+        plt.title("ROC curve. AUC: " + str(auc))
+        plt.show()
+
     def evaluate_references(self, data_test: pd.DataFrame) -> Dict:
         """
         Method for evaluation of suggestions.
@@ -124,7 +180,7 @@ class Completion:
         failed = 0
 
         print("\nEvaluating ...")
-        batch_suggestions = self.refmodel.batch_predict(data_test, 3)
+        batch_suggestions, _ = self.refmodel.batch_predict(data_test, 3)
 
         # compute metrics
         for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):
@@ -142,10 +198,10 @@ class Completion:
         overall_count = three + incorrect + failed
         metrics = {
             "overall_count": overall_count,
-            "first": first,
-            "three": three,
-            "incorrect": incorrect,
-            "failed": failed,
+            "first": first / overall_count,
+            "three": three / overall_count,
+            "incorrect": incorrect / overall_count,
+            "failed": failed / overall_count,
         }
         return metrics
 
@@ -212,10 +268,16 @@ def print_metrics(metrics):
         box=box.ASCII_DOUBLE_HEAD,
     )
     table.add_row("overall test samples", f"{overall_count}")
-    table.add_row("[green]correct (first)", f"{first} ({first / overall_count:2.5f})")
-    table.add_row("[yellow]correct (top 3)", f"{three} ({three / overall_count:2.5f})")
-    table.add_row("[red]incorrect", f"{incorrect} ({incorrect / overall_count:2.5f})")
-    table.add_row("failed", f"{failed} ({failed / overall_count:2.5f})")
+    table.add_row(
+        "[green]correct (first)", f"{int(first * overall_count)} ({first:2.5f})"
+    )
+    table.add_row(
+        "[yellow]correct (top 3)", f"{int(three * overall_count)} ({three:2.5f})"
+    )
+    table.add_row(
+        "[red]incorrect", f"{int(incorrect * overall_count)} ({incorrect:2.5f})"
+    )
+    table.add_row("failed", f"{int(failed * overall_count)} ({failed:2.5f})")
 
     table.add_row("", "")
 

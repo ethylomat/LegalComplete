@@ -10,7 +10,9 @@
 datasets/**
 runs/
 outputs/
+weights/
 wandb/
+.vscode/
 
 ## Python 
 # Profiler

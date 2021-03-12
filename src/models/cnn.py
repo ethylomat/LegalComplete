@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -29,30 +31,26 @@ class CnnModel:
         self.target_vocab = target_vocab
         self.input_vocab = input_vocab
         self.ref_classes = ref_classes
-        self.batch_size = 16
-        self.epochs = 10
-        self.max_sentence_len = 20
+        self.batch_size = args.batch_size
+        self.epochs = args.epochs
+        self.max_sentence_len = args.input_sentence_len
         self.max_decoder_seq_length = 9
         self.steps_per_epoch = len(data_train) // self.batch_size
         self.validation_steps = len(data_test) // self.batch_size
-        self.window_size = 5
-        self.latent_dim = 10
 
-        """sentences = data_train["sentence"].to_list()
-        sentences = [sentence.text.split(" ") for sentence in sentences]
-        self.word_model = Word2Vec(
-            sentences=sentences,
-            vector_size=10,
-            window=self.window_size,
-            min_count=1,
-            workers=4,
-        )"""
-
+        self.latent_dim = args.embedding_dim
         self.num_encoder_tokens = self.input_vocab.vectors.shape[0]
         self.num_decoder_tokens = self.ref_classes.vectors.shape[0]
+
+        self.pad_token = word2idx(self.input_vocab, "<start>", self.num_encoder_tokens)
+
         print("finished init setup")
-        self.model = self.build_model()
-        print("finished building model")
+        if not args.weights:
+            self.model = self.build_model()
+            print("finished building model")
+        else:
+            self.model = tf.keras.models.load_model(args.weights)
+            print("finished loading model weights")
 
     def build_model(self):
         """ builds and returns encoder decoder tensorflow model"""
@@ -61,17 +59,13 @@ class CnnModel:
         x = layers.Embedding(self.num_encoder_tokens, self.latent_dim)(inputs)
         x = layers.Dropout(0.4)(x)
 
-        x = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(16, return_sequences=False, return_state=False)
-        )(x)
+        x = layers.LSTM(32, return_sequences=False, return_state=False)(x)
 
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.4)(x)
-        x = tf.keras.layers.Dense(512, activation="relu")(x)
+        x = tf.keras.layers.Dense(255, activation="relu")(x)
         x = layers.Dropout(0.4)(x)
-        predictions = tf.keras.layers.Dense(
-            self.num_decoder_tokens, activation="softmax"
-        )(x)
+        predictions = layers.Dense(self.num_decoder_tokens, activation="softmax")(x)
 
         model = Model(inputs, predictions)
         model.summary()
@@ -91,9 +85,14 @@ class CnnModel:
     def train(self, train_df, eval_df):
         train_data = self.preprocess(train_df)
         eval_data = self.preprocess(eval_df)
+        topn_acc = tf.keras.metrics.TopKCategoricalAccuracy(
+            k=3, name="top_k_categorical_accuracy", dtype=None
+        )
 
         self.model.compile(
-            optimizer="rmsprop", loss="categorical_crossentropy", metrics=["acc"]
+            optimizer="rmsprop",
+            loss="categorical_crossentropy",
+            metrics=["acc", topn_acc],
         )
         wandb_callback = wandb.keras.WandbCallback(
             verbose=0,
@@ -102,22 +101,21 @@ class CnnModel:
             log_weights=False,
             log_gradients=False,
             save_model=True,
-            training_data=None,
-            validation_data=None,
-            labels=[],
-            data_type=None,
-            predictions=36,
-            generator=None,
-            input_type=None,
-            output_type=None,
             log_evaluation=True,
-            log_batch_frequency=None,
             log_best_prefix="best_",
+        )
+
+        mcp_save = tf.keras.callbacks.ModelCheckpoint(
+            "weights/" + str(time.time()) + "model_weights.h5",
+            save_weights_only=False,
+            save_best_only=True,
+            monitor="val_acc",
+            mode="max",
         )
 
         self.model.fit(
             train_data,
-            callbacks=[wandb_callback],
+            callbacks=[wandb_callback, mcp_save],
             batch_size=self.batch_size,
             steps_per_epoch=self.steps_per_epoch,
             validation_steps=self.validation_steps,
@@ -125,40 +123,58 @@ class CnnModel:
             epochs=self.epochs,
         )
 
-    def predict(self, sent, beam_search_width):
-        # TODO: implement multiple suggestions with beam_search_width param
-        # for now only the first suggestion is made, others are set to None
-        pad_token = word2idx(self.input_vocab, "<start>", self.num_encoder_tokens)
-        sent = process_input_sample(
-            self.input_vocab,
-            self.num_encoder_tokens,
-            sent,
-            self.max_sentence_len,
-            pad_token,
-        )
-        sent = np.reshape(
-            sent,
+    def predict(self, batch, beam_search_width, batch_size):
+        # preprocess samples in batch
+        batch = [
+            process_input_sample(
+                self.input_vocab,
+                self.num_encoder_tokens,
+                sample.text,
+                self.max_sentence_len,
+                self.pad_token,
+            )
+            for sample in batch
+        ]
+        batch = np.reshape(
+            batch,
             (
-                1,
+                batch_size,
                 -1,
             ),
-        )  # reshape to batch_size 1
-        prediction = self.model.predict(sent, batch_size=1)[0]
+        )  # reshape to batch_size
+        batch_prediction = self.model.predict(batch, batch_size=batch_size)
 
-        # prediction_maxed = tf.argmax(prediction, axis=-1)[0]
-        max_n = list(
-            np.argpartition(prediction, -beam_search_width)[-beam_search_width:]
-        )
-        max_n.reverse()
+        batch_top_n = []
+        batch_top_probabilities = []
+        for prediction in batch_prediction:
+            # argmax of top n arguments
+            indicies = np.argpartition(prediction, -beam_search_width)[
+                -beam_search_width:
+            ]
+            indicies_sorted = indicies[np.argsort(prediction[indicies])][::-1]
+            batch_top_n.append(indicies_sorted)
+            batch_top_probabilities.append(prediction[indicies_sorted])
 
-        final_predicions = [idx2word(self.ref_classes, pred) for pred in max_n]
-        return final_predicions
+        batch_top_n_words = []
+        # convert back from ids to words
+        for top_n in batch_top_n:
+            batch_top_n_words.append(
+                [idx2word(self.ref_classes, pred) for pred in top_n]
+            )
+        return batch_top_n_words, batch_top_probabilities
 
     def batch_predict(self, data, beam_search_width):
-        results = []
-        for el in tqdm(data.iloc):
-            results.append(self.predict(el["sentence"].text, beam_search_width))
-        return results
+        def chunker(seq, size):
+            return (seq[pos : pos + size] for pos in range(0, len(seq) - 1, size))
 
-    def eval(self, eval_df):
-        return self.model.eval(eval_df)
+        batch_words = []
+        batch_probabilities = []
+        for chunk in chunker(data, self.batch_size):
+            # loop through dataset in batches
+            sample = chunk["sentence"].to_list()
+            words, probabilities = self.predict(
+                sample, beam_search_width, self.batch_size
+            )
+            batch_words += list(words)
+            batch_probabilities += list(probabilities)
+        return batch_words, batch_probabilities

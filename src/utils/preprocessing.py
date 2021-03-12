@@ -4,10 +4,11 @@ import re
 import numpy as np
 import pandas as pd
 from gensim.models import Word2Vec
+from spacy.language import Language
 from tqdm import tqdm
 
 from src.utils.common import load_spacy_model, read_csv
-from src.utils.matcher import ReferenceMatcher
+from src.utils.matcher import match_reference
 from src.utils.regular_expressions import reference_pattern
 
 MODULE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -28,9 +29,10 @@ def build_pipeline(disable: list = []):
     nlp = load_spacy_model("de_core_news_sm")
 
     # Matching section references using ReferenceMatcher class
-    reference_matcher = ReferenceMatcher()
-    nlp.add_pipe(nlp.create_pipe("sentencizer"))
-    nlp.add_pipe(reference_matcher, before="tagger")
+    Language.component("reference_matcher", func=match_reference)
+
+    nlp.add_pipe("sentencizer")
+    nlp.add_pipe("reference_matcher", before="tagger")
     nlp.disable_pipes(*disable)
 
     print("\nActivated pipes:")
@@ -49,7 +51,17 @@ def preprocess(df, nlp=None, label: str = ""):
     """
 
     if not nlp:
-        nlp = build_pipeline()
+        nlp = build_pipeline(
+            disable=[
+                "tagger",
+                "parser",
+                "ner",
+                "tok2vec",
+                "morphologizer",
+                "attribute_ruler",
+                "lemmatizer",
+            ]
+        )
 
     sentence_reference_pairs = []
 
@@ -115,12 +127,9 @@ def load_vocab(data):
         sentences=[data["reference"].to_list()],
         vector_size=1,
         window=1,
-        min_count=3,
+        min_count=1,
     ).wv
     ref_classes
-    import pdb
-
-    # pdb.set_trace()
 
     return input_vocab, target_vocab, ref_classes
 
@@ -141,14 +150,17 @@ def cnn_generator(
 
     # loop through dataset endless times
     while True:
+        # shuffle dataset
+        data = data.sample(frac=1).reset_index(drop=True)
+
+        # loop through dataset in batches
         for chunk in chunker(data, batch_size):
             ref_vectors = []
             sent_vectors = []
 
             for j in range(len(chunk)):
                 sample = chunk.iloc[j]
-                # sent_vectors = process_input_sample(
-
+                # process input
                 sent_vectors.append(
                     process_input_sample(
                         input_vocab,
@@ -158,13 +170,10 @@ def cnn_generator(
                         start_token,
                     )
                 )
-
-                # ref_vectors = word2onehot(target_vocab, sample['reference'], target_vocab_size)
+                # process output
                 ref_vectors.append(
                     word2onehot(target_vocab, sample["reference"], target_vocab_size)
                 )
-            # ref_vectors = np.reshape(ref_vectors, (batch_size, -1,))
-            # sent_vectors = np.reshape(sent_vectors, (batch_size, -1,))
             ref_vectors = np.array(ref_vectors)
             sent_vectors = np.array(sent_vectors)
             yield sent_vectors, ref_vectors
@@ -231,12 +240,6 @@ def process_input_sample(input_vocab, input_vocab_size, text, sentence_len, pad_
     sent_vectors = np.array(sent_vectors)
     sent_vectors = np.reshape(sent_vectors, (sentence_len))
     return sent_vectors
-
-
-def process_target_sample(
-    target_vocab, target_vocab_size, text, decoder_sentence_len, pad_token
-):
-    """ performs padding, crops to fixed number of words and returns np.array"""
 
 
 def word2idx(vocab, word, tmp=None):
