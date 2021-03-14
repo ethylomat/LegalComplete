@@ -63,13 +63,13 @@ def preprocess(df, nlp=None, label: str = ""):
             ]
         )
 
+    # Replacing newlines and multiple spaces
+    df["text"] = df["text"].apply(lambda x: re.sub(r"[ ]+", " ", x.replace("\n", " ")))
+
     sentence_reference_pairs = []
-
+    # def process_item(text):
     for item in tqdm(df["text"], desc=label):
-
-        # Replacing newlines and multiple spaces
-        text = re.sub(r"[ ]+", " ", item.replace("\n", " "))
-        doc = nlp(text)
+        doc = nlp(item)
 
         for sentence in doc.sents:
             references = [
@@ -77,14 +77,15 @@ def preprocess(df, nlp=None, label: str = ""):
             ]
 
             # Select sentences with only one reference
-            if len(references) == 1:
-                section_reference = references[0]
+            # if len(references) == 1:
+            for ref in references:
                 sentence_reference_pairs.append(
                     [
                         sentence,
-                        str(section_reference),
+                        str(ref),
                     ]
                 )
+    # df["text"] = df["text"].apply(process_item)
 
     sentence_reference_df = pd.DataFrame(
         sentence_reference_pairs, columns=["sentence", "reference"]
@@ -110,7 +111,7 @@ def preprocess_fast(df, nlp=None, label=None):
     return pairs
 
 
-def load_vocab(data):
+def load_vocab(data, classes_min_count=1):
     # a hacky way to get a onehot encoding for words from the target domain
     references = data["reference"].to_list()
     references = ["<start> " + ref + " <end>" for ref in references]
@@ -123,15 +124,25 @@ def load_vocab(data):
     sentences = [("<start> " + sentence.text).split(" ") for sentence in sentences]
     input_vocab = Word2Vec(sentences=sentences, vector_size=1, window=1, min_count=1).wv
 
+    # add empty token to output classes
+    reference_data = data["reference"].to_list() + [
+        "<empty>" for _ in range(classes_min_count)
+    ]
     ref_classes = Word2Vec(
-        sentences=[data["reference"].to_list()],
+        sentences=[reference_data],
         vector_size=1,
         window=1,
-        min_count=1,
+        min_count=classes_min_count,
     ).wv
     ref_classes
 
     return input_vocab, target_vocab, ref_classes
+
+
+def chunker(seq, size):
+    """ returns batches of size size from sequence of objects"""
+    len_cropped = len(seq) // size * size
+    return (seq[pos : pos + size] for pos in range(0, len_cropped, size))
 
 
 def cnn_generator(
@@ -144,9 +155,6 @@ def cnn_generator(
     batch_size,
 ):
     start_token = word2idx(input_vocab, "<start>", input_vocab_size)
-
-    def chunker(seq, size):
-        return (seq[pos : pos + size] for pos in range(0, len(seq) - 1, size))
 
     # loop through dataset endless times
     while True:
@@ -187,11 +195,12 @@ def seq2seq_generator(
     input_vocab_size,
     sentence_len,
     decoder_sentence_len,
+    batch_size,
 ):
-    target_tensor_shape = (decoder_sentence_len, target_vocab_size)
     end_token = word2onehot(target_vocab, "<end>", target_vocab_size)
     start_token = word2onehot(input_vocab, "<start>", input_vocab_size)
-    start_target_token = word2onehot(target_vocab, "<start>", target_vocab_size)
+    # start_target_token = word2onehot(target_vocab, "<start>", target_vocab_size)
+    start_target_token = "<start>"
     for sample in data.iloc:
 
         sent_vectors = process_input_sample(
@@ -202,30 +211,46 @@ def seq2seq_generator(
             start_token,
         )
 
-        reference = sample["reference"].split(" ")
-        ref_vectors = [
-            word2onehot(target_vocab, word, target_vocab_size) for word in reference
-        ]
+        ref_vectors = sample["reference"].split(" ")
         # crop to fixed number of input words
         ref_vectors = ref_vectors[
             : decoder_sentence_len - 1
         ]  # -1 because of start token
-        padding_target = decoder_sentence_len - 1 - len(ref_vectors)
 
+        # padding
+        padding_target = decoder_sentence_len - 1 - len(ref_vectors)
         ref_vectors = (
             [start_target_token]
             + ref_vectors
-            + [end_token for i in range(padding_target)]
+            + ["<end>" for i in range(padding_target)]
         )
-        ref_vectors_shifted = ref_vectors[1:] + [end_token]
 
-        ref_vectors = np.array(ref_vectors)
+        # convert words to integers
+        ref_vectors_ids = [
+            word2idx(target_vocab, word, target_vocab_size) for word in ref_vectors
+        ]
+        # convert words to onehot encoded rows
+        ref_vectors_onehots = [
+            word2onehot(target_vocab, word, target_vocab_size) for word in ref_vectors
+        ]
+
+        ref_vectors_shifted = np.array(ref_vectors_onehots[1:] + [end_token])
+        ref_vectors_ids = np.array(ref_vectors_ids)
         ref_vectors_shifted = np.array(ref_vectors_shifted)
 
-        ref_vectors = np.reshape(ref_vectors, target_tensor_shape)
-        ref_vectors_shifted = np.reshape(ref_vectors_shifted, target_tensor_shape)
-        x = {"encoder_input": sent_vectors, "decoder_input": ref_vectors}
-        yield (x, ref_vectors_shifted)
+        ref_vectors_ids = np.reshape(
+            ref_vectors_ids, (batch_size, decoder_sentence_len)
+        )
+        ref_vectors_shifted = np.reshape(
+            ref_vectors_shifted, (batch_size, decoder_sentence_len, target_vocab_size)
+        )
+        sent_vectors = np.reshape(sent_vectors, (batch_size, sentence_len))
+
+        x = {"encoder_input": sent_vectors, "decoder_input": ref_vectors_ids}
+        print("sent_vector shape:", sent_vectors.shape)
+        print("ref_vector_ids:", ref_vectors_ids.shape)
+        print("ref_vector_shifted:", ref_vectors_shifted.shape)
+        yield x, ref_vectors_shifted
 
 
 def process_input_sample(input_vocab, input_vocab_size, text, sentence_len, pad_token):
@@ -244,7 +269,7 @@ def process_input_sample(input_vocab, input_vocab_size, text, sentence_len, pad_
 
 def word2idx(vocab, word, tmp=None):
     if word not in vocab.index_to_key:
-        return vocab.key_to_index["§ 17 Abs. 1 Satz 2 FStrG"]  # TODO replace
+        return vocab.key_to_index["<empty>"]
     else:
         return vocab.key_to_index[word]
 

@@ -106,6 +106,7 @@ class NGramCompletion:
         self.find_ngrams(data)
         self.find_bigrams(data, test=True)
         batch_suggestions = []
+        batch_probabilities = []
         for test_sample in data.iloc:
             # trigger_prob = self.get_trigger_prob(test_sample["ngram no sw"][-2:-1])
             x = test_sample["ngram"][:-1]  # Input (n-1)-gram
@@ -113,8 +114,10 @@ class NGramCompletion:
 
             # Top 3 suggestions
             suggestions = [suggestion[1] for suggestion in self.get_suggestions(x, 3)]
+            probabilities = [suggestion[0] for suggestion in self.get_suggestions(x, 3)]
             batch_suggestions.append(suggestions)
-        return batch_suggestions
+            batch_probabilities.append(probabilities)
+        return batch_suggestions, batch_probabilities
 
     @timer
     def find_ngrams(self, df):

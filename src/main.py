@@ -40,13 +40,29 @@ def parse_arguments():
         "--embedding_dim", type=int, default=32, help="vector length of word embeddings"
     )
     parser.add_argument(
+        "--classes_min_count",
+        type=int,
+        default=1,
+        help="when using RNNCLASS model mininum "
+        "count for reference to be part of target classes",
+    )
+    parser.add_argument(
         "--input_sentence_len",
         type=int,
         default=30,
         help="number of words to input to model",
     )
     parser.add_argument(
+        "--drop_data_rate",
+        type=float,
+        default=0.0,
+        help="dataset samples will be dropped randomly according at this rate before preprocessing",
+    )
+    parser.add_argument(
         "--weights", type=str, default=None, help="itialize model from this path"
+    )
+    parser.add_argument(
+        "--nowandb", action="store_true", help="set to disable wandb connection"
     )
     return parser.parse_args()
 
@@ -57,8 +73,9 @@ if __name__ == "__main__":
     wandb_is_initialized = False
 
     if not args.dont_train:
-        wandb.init(project="legalcomplete", config=args)
-        wandb_is_initialized = True
+        if not args.nowandb:
+            wandb.init(project="legalcomplete", config=args)
+            wandb_is_initialized = True
         c.train_data()
     if not args.dont_eval:
         metrics = c.evaluate_references(c.data_test)

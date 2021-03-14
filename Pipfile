@@ -18,8 +18,10 @@ numpy = "*"
 tqdm = "*"
 pandas = "*"
 rich = "*"
-gensim = "*"
+gensim = "==4.0.0b0"
 wandb = "*"
+tensorflow = "*"
+matplotlib = "*"
 
 [scripts]
 test = "coverage run -m unittest discover -s ./tests -p *_test.py"

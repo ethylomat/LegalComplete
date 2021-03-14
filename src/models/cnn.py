@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 import wandb
 from src.utils.preprocessing import (
+    chunker,
     cnn_generator,
     idx2word,
     preprocess_fast,
@@ -37,6 +38,7 @@ class CnnModel:
         self.max_decoder_seq_length = 9
         self.steps_per_epoch = len(data_train) // self.batch_size
         self.validation_steps = len(data_test) // self.batch_size
+        self.args = args
 
         self.latent_dim = args.embedding_dim
         self.num_encoder_tokens = self.input_vocab.vectors.shape[0]
@@ -47,6 +49,7 @@ class CnnModel:
         print("finished init setup")
         if not args.weights:
             self.model = self.build_model()
+
             print("finished building model")
         else:
             self.model = tf.keras.models.load_model(args.weights)
@@ -59,8 +62,7 @@ class CnnModel:
         x = layers.Embedding(self.num_encoder_tokens, self.latent_dim)(inputs)
         x = layers.Dropout(0.4)(x)
 
-        x = layers.LSTM(32, return_sequences=False, return_state=False)(x)
-
+        x = layers.LSTM(64, return_sequences=False, return_state=False)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.4)(x)
         x = tf.keras.layers.Dense(255, activation="relu")(x)
@@ -94,16 +96,6 @@ class CnnModel:
             loss="categorical_crossentropy",
             metrics=["acc", topn_acc],
         )
-        wandb_callback = wandb.keras.WandbCallback(
-            verbose=0,
-            mode="auto",
-            save_weights_only=False,
-            log_weights=False,
-            log_gradients=False,
-            save_model=True,
-            log_evaluation=True,
-            log_best_prefix="best_",
-        )
 
         mcp_save = tf.keras.callbacks.ModelCheckpoint(
             "weights/" + str(time.time()) + "model_weights.h5",
@@ -112,10 +104,23 @@ class CnnModel:
             monitor="val_acc",
             mode="max",
         )
+        callbacks = [mcp_save]
+        if not self.args.nowandb:
+            wandb_callback = wandb.keras.WandbCallback(
+                verbose=0,
+                mode="auto",
+                save_weights_only=False,
+                log_weights=False,
+                log_gradients=False,
+                save_model=True,
+                log_evaluation=True,
+                log_best_prefix="best_",
+            )
+            callbacks.append(wandb_callback)
 
         self.model.fit(
             train_data,
-            callbacks=[wandb_callback, mcp_save],
+            callbacks=callbacks,
             batch_size=self.batch_size,
             steps_per_epoch=self.steps_per_epoch,
             validation_steps=self.validation_steps,
@@ -125,16 +130,19 @@ class CnnModel:
 
     def predict(self, batch, beam_search_width, batch_size):
         # preprocess samples in batch
-        batch = [
-            process_input_sample(
-                self.input_vocab,
-                self.num_encoder_tokens,
-                sample.text,
-                self.max_sentence_len,
-                self.pad_token,
-            )
-            for sample in batch
-        ]
+        batch = np.array(
+            [
+                process_input_sample(
+                    self.input_vocab,
+                    self.num_encoder_tokens,
+                    sample.text,
+                    self.max_sentence_len,
+                    self.pad_token,
+                )
+                for sample in batch
+            ]
+        )
+
         batch = np.reshape(
             batch,
             (
@@ -164,8 +172,6 @@ class CnnModel:
         return batch_top_n_words, batch_top_probabilities
 
     def batch_predict(self, data, beam_search_width):
-        def chunker(seq, size):
-            return (seq[pos : pos + size] for pos in range(0, len(seq) - 1, size))
 
         batch_words = []
         batch_probabilities = []

@@ -8,7 +8,7 @@ from src.utils.preprocessing import preprocess
 
 
 class Seq2seqModel:
-    def __init__(self, data_train):
+    def __init__(self, args, data_train):
         self.window_size = 5
         self.batch_size = 4
         self.epochs = 10

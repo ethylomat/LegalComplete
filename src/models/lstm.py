@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from gensim.models import Word2Vec
-from keras.layers import LSTM, Dense, Embedding, Input
-from keras.models import Model
+from tensorflow.keras.layers import LSTM, Dense, Embedding, Input
+from tensorflow.keras.models import Model
 
 from src.utils.preprocessing import (
     idx2word,
@@ -26,18 +27,7 @@ class LstmModel:
         self.max_sentence_len = 7
         self.max_decoder_seq_length = 7
 
-        self.window_size = 5
         self.latent_dim = 10
-
-        """sentences = data_train["sentence"].to_list()
-        sentences = [sentence.text.split(" ") for sentence in sentences]
-        self.word_model = Word2Vec(
-            sentences=sentences,
-            vector_size=10,
-            window=self.window_size,
-            min_count=1,
-            workers=4,
-        )"""
 
         self.num_encoder_tokens = self.input_vocab.vectors.shape[0]
         self.num_decoder_tokens = self.target_vocab.vectors.shape[0]
@@ -48,13 +38,21 @@ class LstmModel:
     def build_model(self):
         """ builds and returns encoder decoder tensorflow model"""
 
-        encoder_inputs = Input(shape=(None,), name="encoder_input")
+        encoder_inputs = Input(
+            batch_size=self.batch_size,
+            shape=(self.max_sentence_len,),
+            name="encoder_input",
+        )
         x = Embedding(self.num_encoder_tokens, self.latent_dim)(encoder_inputs)
         x, state_h, state_c = LSTM(self.latent_dim, return_state=True)(x)
         encoder_states = [state_h, state_c]
 
         # Set up the decoder, using `encoder_states` as initial state.
-        decoder_inputs = Input(shape=(None,), name="decoder_input")
+        decoder_inputs = Input(
+            batch_size=self.batch_size,
+            shape=(self.max_decoder_seq_length,),
+            name="decoder_input",
+        )
         x = Embedding(
             self.num_decoder_tokens, self.latent_dim, input_length=self.max_sentence_len
         )(decoder_inputs)
@@ -64,13 +62,20 @@ class LstmModel:
         decoder_dense = Dense(self.num_decoder_tokens, activation="softmax")
         decoder_outputs = decoder_dense(decoder_outputs)
 
-        model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
+        model = Model(
+            {"encoder_input": encoder_inputs, "decoder_input": decoder_inputs},
+            decoder_outputs,
+        )
+        print("combined model:")
         print(model.summary())
-
+        print()
         # inference setup
         decoder_lstm = LSTM(self.latent_dim, return_sequences=False, return_state=True)
 
         self.encoder_model = Model(encoder_inputs, encoder_states)
+        print("encoder model:")
+        print(self.encoder_model.summary())
+        print()
 
         decoder_state_input_h = Input(shape=(self.latent_dim,), name="decoder_state_h")
         decoder_state_input_c = Input(shape=(self.latent_dim,), name="decoder_state_c")
@@ -88,7 +93,8 @@ class LstmModel:
             },
             [decoder_outputs] + decoder_states,
         )
-
+        print("decoder model:")
+        print(self.decoder_model.summary())
         return model
 
     def preprocess(self, data):
@@ -100,16 +106,22 @@ class LstmModel:
             self.num_encoder_tokens,
             self.max_sentence_len,
             self.max_decoder_seq_length,
+            self.batch_size,
         )
-
-    def convert_to_fixed_length_input(self, data):
-        pass
 
     def train(self, train_df, eval_df):
         train_data = self.preprocess(train_df)
         eval_data = self.preprocess(eval_df)
 
-        self.model.compile(optimizer="rmsprop", loss="sparse_categorical_crossentropy")
+        def custom_loss(y_true, y_pred):
+            print("y_true:", y_true)
+            print("y_pred: ", y_pred)
+            y_true = tf.reshape(y_true, (self.batch_size, self.num_decoder_tokens))
+            return tf.keras.losses.CategoricalCrossentropy(
+                from_logits=False, name="categorical_crossentropy"
+            )(y_true, y_pred)
+
+        self.model.compile(optimizer="rmsprop", loss=custom_loss)
         self.model.fit(
             train_data,
             steps_per_epoch=5,
@@ -129,9 +141,6 @@ class LstmModel:
             results.append(self.predict(el["sentence"].text, beam_search_width))
             print(el["sentence"], "->", results[-1])
         return results
-
-    def eval(self, eval_df):
-        return self.model.eval(eval_df)
 
     def decode_sequence(self, input_seq):
         # Encode the input as state vectors.
@@ -160,6 +169,8 @@ class LstmModel:
         # (to simplify, here we assume a batch of size 1).
         stop_condition = False
         decoded_sentence = ""
+        print()
+        print("encoder:")
         print(self.encoder_model.summary())
         state_c = np.reshape(state_c, (1, self.max_decoder_seq_length, self.latent_dim))
         state_h = np.reshape(state_h, (1, self.max_decoder_seq_length, self.latent_dim))
@@ -168,7 +179,9 @@ class LstmModel:
             "decode_state_h": state_h,
             "decoder_state_c": state_c,
         }
+        print()
 
+        print("decoder:")
         print(self.decoder_model.summary())
         while not stop_condition:
             output_tokens, h, c = self.decoder_model.predict(x, batch_size=1)

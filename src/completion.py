@@ -51,7 +51,7 @@ class Completion:
             self.refmodel = NGramCompletion(self.nlp)
         elif args.model_name == "SEQ2SEQ":
             self.refmodel = TransSeqModel(args)
-        elif args.model_name == "CNN":
+        elif args.model_name == "RNNCLASS":
             self.refmodel = CnnModel(
                 args,
                 self.data_train,
@@ -86,13 +86,19 @@ class Completion:
         if args.model_name == "NGRAM":
             self.preprocess = preprocess
         else:
-            self.preprocess = preprocess_fast
-        # full_df.drop(
-        #     full_df.index[: len(full_df) // 2], 0, inplace=True
-        # )  # reduce dataset for fast debugging TODO Remove
+            self.preprocess = preprocess
+
+        print("len dataset: ", len(full_df))
+        full_df = full_df.sample(frac=1, random_state=1).reset_index(drop=True)
+        full_df.drop(
+            full_df.index[: int(len(full_df) * args.drop_data_rate)], 0, inplace=True
+        )  # reduce dataset for fast debugging TODO Remove
+        print("len dataset after drops ", len(full_df))
 
         full_df = self.preprocess(full_df, nlp=self.nlp, label="full df")
-        self.input_vocab, self.target_vocab, self.ref_classes = load_vocab(full_df)
+        self.input_vocab, self.target_vocab, self.ref_classes = load_vocab(
+            full_df, args.classes_min_count
+        )
 
         # Splitting dataframe into different sets
         self.data_train, self.data_test, self.data_dev = split_dataframe(
@@ -136,9 +142,17 @@ class Completion:
                 break
             i += 1
 
+    def is_correct_substring(self, gt, prediction):
+        return (
+            prediction in gt
+            and gt.startswith(prediction)
+            and len(prediction) > 1
+            and prediction.split(" ")[0] in gt
+        )
+
     def evaluate_ROC(self, data_test: pd.DataFrame):
         import matplotlib
-        from sklearn.metrics import auc, roc_curve
+        from sklearn.metrics import auc, precision_recall_curve, roc_curve
 
         matplotlib.use("TkAgg")
         import matplotlib.pyplot as plt
@@ -146,6 +160,13 @@ class Completion:
         words, probabilities = self.refmodel.batch_predict(data_test, 1)
         # is list of lists with only one element
         probabilities = [p[0] for p in probabilities]
+
+        # <empty> would be predicted with high likelyhood of being true because that is what the model sees during training.
+        # however it should be zero. useful for ROC and precision recall curve
+        for i in range(len(words)):
+            if words[i] == "<empty>":
+                probabilities[i] = 0.0
+
         words = [w[0] for w in words]
         y_true = np.array(data_test["reference"])
 
@@ -154,7 +175,18 @@ class Completion:
 
         fpr_keras, tpr_keras, thresholds_keras = roc_curve(x_test, probabilities)
         auc = auc(fpr_keras, tpr_keras)
+
+        precision, recall, thresholds = precision_recall_curve(x_test, probabilities)
+
+        plt.title("precision recall curve")
+        plt.ylabel("precision")
+        plt.xlabel("recall")
+        plt.plot(recall, precision)
+        plt.show()
+
+        plt.title("thresholds")
         plt.plot(thresholds_keras, label="thresholds")
+        plt.ylim(0, 1)
         plt.show()
         plt.plot(fpr_keras, tpr_keras, label="ROC")
         plt.plot([0, 1], [0, 1], color="navy", linestyle="--")
@@ -175,6 +207,7 @@ class Completion:
         """
 
         first = 0
+        correct_subphrase = 0
         three = 0
         incorrect = 0
         failed = 0
@@ -186,6 +219,8 @@ class Completion:
         for (suggestions, test_sample) in zip(batch_suggestions, data_test.iloc):
             y = test_sample["reference"]
             if len(suggestions) > 0:
+                if self.is_correct_substring(y, suggestions[0]):
+                    correct_subphrase += 1
                 if y == suggestions[0]:
                     first += 1
                 if y in suggestions:
@@ -195,10 +230,11 @@ class Completion:
             else:
                 failed += 1
 
-        overall_count = three + incorrect + failed
+        overall_count = len(batch_suggestions)
         metrics = {
             "overall_count": overall_count,
             "first": first / overall_count,
+            "correct_subphrase": correct_subphrase / overall_count,
             "three": three / overall_count,
             "incorrect": incorrect / overall_count,
             "failed": failed / overall_count,
@@ -254,6 +290,7 @@ class Completion:
 def print_metrics(metrics):
     overall_count = metrics["overall_count"]
     first = metrics["first"]
+    correct_subphrase = metrics["correct_subphrase"]
     three = metrics["three"]
     incorrect = metrics["incorrect"]
     failed = metrics["failed"]
@@ -273,6 +310,10 @@ def print_metrics(metrics):
     )
     table.add_row(
         "[yellow]correct (top 3)", f"{int(three * overall_count)} ({three:2.5f})"
+    )
+    table.add_row(
+        "[yellow]correct_subphrase",
+        f"{int(correct_subphrase * overall_count)} ({correct_subphrase:2.5f})",
     )
     table.add_row(
         "[red]incorrect", f"{int(incorrect * overall_count)} ({incorrect:2.5f})"
