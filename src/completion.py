@@ -14,6 +14,7 @@ from rich import box, print
 from rich.table import Table
 from tqdm import tqdm
 
+import wandb
 from src.completion_n_gram import NGramCompletion
 from src.models.cnn import CnnModel
 from src.models.lstm import LstmModel
@@ -35,6 +36,7 @@ class Completion:
     """
 
     def __init__(self, args):
+        self.args = args
         self.nlp = build_pipeline(
             disable=[
                 "tagger",
@@ -86,7 +88,7 @@ class Completion:
         if args.model_name == "NGRAM":
             self.preprocess = preprocess
         else:
-            self.preprocess = preprocess
+            self.preprocess = preprocess_fast
 
         print("len dataset: ", len(full_df))
         full_df = full_df.sample(frac=1, random_state=1).reset_index(drop=True)
@@ -177,6 +179,22 @@ class Completion:
         auc = auc(fpr_keras, tpr_keras)
 
         precision, recall, thresholds = precision_recall_curve(x_test, probabilities)
+        index = next(i for i, v in enumerate(precision) if v > 0.95)
+        if index >= len(precision) - 1:
+            print("95% precision not reached at any recall")
+            final_recall = 0.0
+
+        else:
+            print(
+                "recall at 95% precision is ",
+                recall[index],
+                " threshold: ",
+                thresholds[index],
+            )
+            final_recall = recall[index]
+        if not self.args.nowandb:
+            # wandb.run.summary["recall_at_95"] = final_recall
+            wandb.run.summary.update({"recall_at_95": final_recall})
 
         plt.title("precision recall curve")
         plt.ylabel("precision")

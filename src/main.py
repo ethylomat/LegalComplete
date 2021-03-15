@@ -64,6 +64,14 @@ def parse_arguments():
     parser.add_argument(
         "--nowandb", action="store_true", help="set to disable wandb connection"
     )
+    parser.add_argument(
+        "--use_GRU", action="store_true", help="set to GRU instaed of LSTM"
+    )
+    parser.add_argument(
+        "--use_document_context",
+        action="store_true",
+        help="set to include verfahrensart and dokumentart to RNNCLASS training",
+    )
     return parser.parse_args()
 
 
@@ -71,11 +79,10 @@ if __name__ == "__main__":
     args = parse_arguments()
     c = Completion(args)
     wandb_is_initialized = False
-
+    if not args.nowandb:
+        wandb.init(project="legalcomplete", config=args)
+        wandb_is_initialized = True
     if not args.dont_train:
-        if not args.nowandb:
-            wandb.init(project="legalcomplete", config=args)
-            wandb_is_initialized = True
         c.train_data()
     if not args.dont_eval:
         metrics = c.evaluate_references(c.data_test)

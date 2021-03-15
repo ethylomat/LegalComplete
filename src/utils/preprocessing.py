@@ -94,20 +94,33 @@ def preprocess(df, nlp=None, label: str = ""):
 
 
 def preprocess_fast(df, nlp=None, label=None):
-    sentences, references = [], []
+    sentences, references, document_vectors = [], [], []
 
-    def matcher_df(text):
-        for match in re.finditer(reference_pattern, text):
+    def matcher_df(row):
+
+        for match in re.finditer(reference_pattern, row["text"]):
             start, end = match.span()
 
-            sentence = text[max(0, start - 100) : start - 1]
-            reference = text[start:end]
+            sentence = row["text"][max(0, start - 100) : start - 1]
+            reference = row["text"][start:end]
             sentences.append(nlp(sentence))
             references.append(reference)
+            docvect = {
+                "verfahrensart": row["Verfahrensart"],
+                "entscheidungsart": row["Entscheidungsart"],
+            }
+            document_vectors.append(docvect)
 
     df["text"] = df["text"].apply(lambda x: re.sub(r"[ ]+", " ", x.replace("\n", " ")))
-    df["text"] = df["text"].apply(matcher_df)
-    pairs = pd.DataFrame({"sentence": sentences, "reference": references})
+    df = df.apply(matcher_df, axis=1)
+    pairs = pd.DataFrame(
+        {
+            "sentence": sentences,
+            "reference": references,
+            "document_vector": document_vectors,
+        }
+    )
+
     return pairs
 
 
@@ -145,6 +158,53 @@ def chunker(seq, size):
     return (seq[pos : pos + size] for pos in range(0, len_cropped, size))
 
 
+verfahrensarten = [
+    "A",
+    "AV",
+    "B",
+    "BN",
+    "C",
+    "CN",
+    "D",
+    "D-PKH",
+    "DB",
+    "DW",
+    "F",
+    "KSt",
+    "P",
+    "PB",
+    "PKH",
+    "VR",
+    "WA",
+    "WB",
+    "WD",
+    "WDB",
+    "WDS-AV",
+    "WDS-KSt",
+    "WDS-PKH",
+    "WDS-VR",
+    "WDW",
+    "WNB",
+    "WRB",
+]
+
+
+def docvecs_from_chunk(chunk):
+    verfahrensart_ids = []
+    entscheidungsart_ids = []
+    for j in range(len(chunk)):
+        sample = chunk.iloc[j]
+        verfahrensart_id = verfahrensarten.index(
+            sample["document_vector"]["verfahrensart"]
+        )
+        entscheidungsart_id = (
+            sample["document_vector"]["entscheidungsart"] == "B"
+        )  # set to 1 if B or to 0 if U
+        verfahrensart_ids.append(verfahrensart_id)
+        entscheidungsart_ids.append(entscheidungsart_id)
+    return np.array(verfahrensart_ids), np.array(entscheidungsart_ids)
+
+
 def cnn_generator(
     data,
     target_vocab,
@@ -153,6 +213,7 @@ def cnn_generator(
     input_vocab_size,
     sentence_len,
     batch_size,
+    use_document_context,
 ):
     start_token = word2idx(input_vocab, "<start>", input_vocab_size)
 
@@ -166,7 +227,9 @@ def cnn_generator(
             ref_vectors = []
             sent_vectors = []
 
+            # for all samples in batch
             for j in range(len(chunk)):
+
                 sample = chunk.iloc[j]
                 # process input
                 sent_vectors.append(
@@ -182,9 +245,18 @@ def cnn_generator(
                 ref_vectors.append(
                     word2onehot(target_vocab, sample["reference"], target_vocab_size)
                 )
+
             ref_vectors = np.array(ref_vectors)
             sent_vectors = np.array(sent_vectors)
-            yield sent_vectors, ref_vectors
+            verfahrensart_ids, entscheidungsart_ids = docvecs_from_chunk(chunk)
+            if use_document_context:
+                yield (
+                    sent_vectors,
+                    verfahrensart_ids,
+                    entscheidungsart_ids,
+                ), ref_vectors
+            else:
+                yield sent_vectors, ref_vectors
 
 
 def seq2seq_generator(

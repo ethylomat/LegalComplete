@@ -14,6 +14,7 @@ import wandb
 from src.utils.preprocessing import (
     chunker,
     cnn_generator,
+    docvecs_from_chunk,
     idx2word,
     preprocess_fast,
     process_input_sample,
@@ -61,16 +62,31 @@ class CnnModel:
         inputs = tf.keras.Input(shape=(None,))
         x = layers.Embedding(self.num_encoder_tokens, self.latent_dim)(inputs)
         x = layers.Dropout(0.4)(x)
+        if self.args.use_GRU:
+            x = layers.GRU(64, return_sequences=False, return_state=False)(x)
+        else:
+            x = layers.LSTM(64, return_sequences=False, return_state=False)(x)
 
-        x = layers.LSTM(64, return_sequences=False, return_state=False)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.4)(x)
+
+        if self.args.use_document_context:
+            verfahrensart_input = tf.keras.Input(shape=(1,))
+            dokumentart_input = tf.keras.Input(shape=(1,))
+            concat_list = [x, verfahrensart_input, dokumentart_input]
+            x = tf.keras.layers.Concatenate()(concat_list)
+
         x = tf.keras.layers.Dense(255, activation="relu")(x)
         x = layers.Dropout(0.4)(x)
-        predictions = layers.Dense(self.num_decoder_tokens, activation="softmax")(x)
-
-        model = Model(inputs, predictions)
-        model.summary()
+        outputs = layers.Dense(self.num_decoder_tokens, activation="softmax")(x)
+        inputs_list = [inputs]
+        if self.args.use_document_context:
+            inputs_list.append(verfahrensart_input)
+            inputs_list.append(dokumentart_input)
+        model = Model(inputs_list, outputs)
+        tf.keras.utils.plot_model(
+            model, "RNN_model.png", show_shapes=True, show_layer_names=False
+        )
         return model
 
     def preprocess(self, data):
@@ -82,6 +98,7 @@ class CnnModel:
             self.num_encoder_tokens,
             self.max_sentence_len,
             self.batch_size,
+            self.args.use_document_context,
         )
 
     def train(self, train_df, eval_df):
@@ -128,7 +145,14 @@ class CnnModel:
             epochs=self.epochs,
         )
 
-    def predict(self, batch, beam_search_width, batch_size):
+    def predict(
+        self,
+        batch,
+        verfahrensart_ids,
+        entscheidungsart_ids,
+        beam_search_width,
+        batch_size,
+    ):
         # preprocess samples in batch
         batch = np.array(
             [
@@ -150,7 +174,11 @@ class CnnModel:
                 -1,
             ),
         )  # reshape to batch_size
-        batch_prediction = self.model.predict(batch, batch_size=batch_size)
+        if self.args.use_document_context:
+            model_inputs = [batch, verfahrensart_ids, entscheidungsart_ids]
+        else:
+            model_inputs = batch
+        batch_prediction = self.model.predict(model_inputs, batch_size=batch_size)
 
         batch_top_n = []
         batch_top_probabilities = []
@@ -178,8 +206,14 @@ class CnnModel:
         for chunk in chunker(data, self.batch_size):
             # loop through dataset in batches
             sample = chunk["sentence"].to_list()
+            verfahrensart_ids, entscheidungsart_ids = docvecs_from_chunk(chunk)
+
             words, probabilities = self.predict(
-                sample, beam_search_width, self.batch_size
+                sample,
+                verfahrensart_ids,
+                entscheidungsart_ids,
+                beam_search_width,
+                self.batch_size,
             )
             batch_words += list(words)
             batch_probabilities += list(probabilities)
